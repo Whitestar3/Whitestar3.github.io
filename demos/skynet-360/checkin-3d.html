@@ -1,0 +1,1086 @@
+<!doctype html><html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Checkin 3D — CD-01</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0c0e18;--surface:#0d0f1b;--card:#121526;--border:#1e243d;
+  --green:#27ae60;--yellow:#f1c40f;--red:#e74c3c;--burnt:#8e44ad;--cyan:#00f3ff;
+  --txt:#dde2ee;--sub:#5d6d8a;--accent:#f39c12;
+}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+.topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:30}
+.back{color:var(--accent);font-size:.8rem;font-weight:700;text-decoration:none;opacity:.8;transition:opacity .15s}.back:hover{opacity:1}
+.sep{width:1px;height:16px;background:var(--border)}
+.zone-title{font-size:.9rem;font-weight:800;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.zone-sub{font-size:.65rem;color:var(--sub)}
+.topbar-kpis{display:flex;gap:14px;margin-left:auto;align-items:center}
+.tk{display:flex;align-items:center;gap:5px;font-size:.72rem}
+.tk-dot{width:8px;height:8px;border-radius:2px}
+.tk-v{font-weight:700}
+.live{display:flex;align-items:center;gap:6px;font-size:.65rem;color:var(--sub);margin-left:8px;background:rgba(255,255,255,0.03);padding:3px 8px;border-radius:10px;border:1px solid var(--border)}
+.ldot{width:6px;height:6px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+.ldot.loading{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.main-wrapper{flex:1;display:flex;min-height:0;position:relative;overflow:hidden}
+#three-canvas{width:100%;height:100%;display:block;cursor:grab}
+#three-canvas:active{cursor:grabbing}
+.nav-hint{position:absolute;bottom:15px;left:20px;background:rgba(13,15,27,0.85);border:1px solid var(--border);padding:6px 12px;border-radius:20px;font-size:.65rem;color:var(--sub);pointer-events:none;z-index:10;backdrop-filter:blur(4px)}
+#loading-overlay{position:absolute;inset:0;background:rgba(7,8,14,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;gap:14px}
+#loading-overlay .spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite}
+#loading-overlay .load-txt{font-size:.75rem;color:var(--sub)}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Panel Lateral */
+.urgent{width:275px;flex-shrink:0;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;z-index:20;box-shadow:-5px 0 20px rgba(0,0,0,0.5)}
+.urg-head{padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.urg-title{font-size:.72rem;font-weight:800;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.urg-ts{font-size:.58rem;color:var(--sub)}
+/* TABS */
+.tab-btns{display:flex;gap:4px;padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab-btn{flex:1;background:var(--card);border:1px solid var(--border);color:var(--sub);padding:5px 6px;border-radius:4px;font-size:.6rem;font-weight:700;cursor:pointer;transition:all .2s;text-align:center}
+.tab-btn.active{background:rgba(0,243,255,0.1);border-color:var(--cyan);color:var(--cyan)}
+.tab-btn:hover:not(.active){border-color:var(--txt);color:var(--txt)}
+/* Tab urgentes */
+#tab-urgentes{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.urg-counters{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.urg-ct{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 8px}
+.urg-ct-v{font-size:1.1rem;font-weight:800;line-height:1}
+.urg-ct-l{font-size:.5rem;color:var(--sub);text-transform:uppercase;margin-top:2px}
+.urg-ct.burnt .urg-ct-v{color:var(--burnt)}
+.urg-ct.red .urg-ct-v{color:var(--red)}
+.urg-ct.yellow .urg-ct-v{color:var(--yellow)}
+.urg-ct.green .urg-ct-v{color:var(--green)}
+.urg-list{flex:1;overflow-y:auto;padding:6px 8px}
+.urg-item{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:6px 8px;margin-bottom:4px;cursor:pointer;transition:all .15s}
+.urg-item:hover{border-color:var(--cyan);transform:translateX(-2px);background:#161b30}
+.urg-item.burnt{border-left:4px solid var(--burnt)}
+.urg-item.red{border-left:4px solid var(--red)}
+.urg-item.yellow{border-left:4px solid var(--yellow)}
+.urg-item.green{border-left:4px solid var(--green)}
+.ui-row1{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.ui-hrs{font-size:.6rem;font-weight:800;padding:2px 5px;border-radius:3px;min-width:32px;text-align:center}
+.ui-hrs.burnt{background:rgba(142,68,173,0.3);color:#d7bde2}
+.ui-hrs.red{background:rgba(231,76,60,0.2);color:var(--red)}
+.ui-hrs.yellow{background:rgba(241,196,15,0.2);color:var(--yellow)}
+.ui-hrs.green{background:rgba(39,174,96,0.2);color:var(--green)}
+.ui-id{font-size:.65rem;font-weight:700;color:var(--txt)}
+.ui-range{font-size:.58rem;color:var(--sub);margin-left:auto;font-family:monospace}
+.ui-row2{display:flex;gap:6px;align-items:center}
+.ui-klass{font-size:.52rem;padding:1px 5px;border-radius:3px;font-weight:700}
+.ui-seller{font-size:.55rem;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Tab Reps */
+#tab-reps{display:none;flex:1;overflow-y:auto;padding:6px 8px}
+.rep-item{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:7px 9px;margin-bottom:4px;transition:border-color .15s}
+.rep-item:hover{border-color:rgba(0,243,255,0.4)}
+.rep-top{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.rep-zone{font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.rep-wt{font-size:.58rem;color:var(--sub);font-family:monospace;font-weight:700;flex-shrink:0}
+.rep-name{font-size:.65rem;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.rep-stats{display:flex;gap:10px;margin-top:2px}
+.rep-stat{font-size:.6rem;color:var(--sub)}
+.rep-stat b{color:var(--txt)}
+.rep-stat b.hi{color:var(--cyan)}
+.rep-totes-codes{margin-top:3px;font-size:.54rem;color:var(--sub);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.01em}
+.reps-empty{color:var(--sub);font-size:.65rem;padding:20px 12px;text-align:center;line-height:1.8}
+/* Popover */
+.popover{position:fixed;width:330px;background:rgba(15,18,32,0.96);backdrop-filter:blur(16px);border:1px solid var(--cyan);border-radius:8px;box-shadow:0 0 25px rgba(0,243,255,0.25);z-index:100;padding:14px;font-size:.7rem;display:none}
+.pop-close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--sub);font-size:1rem;line-height:1}.pop-close:hover{color:#fff}
+.pop-title{font-weight:800;font-size:.82rem;color:var(--txt);margin-bottom:10px;padding-right:20px;display:flex;align-items:center;justify-content:space-between}
+.pop-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a2138}
+.pop-lbl{color:var(--sub);flex-shrink:0}
+.pop-val{font-weight:600;color:var(--txt);text-align:right;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pop-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:800;font-size:.6rem;text-transform:uppercase}
+.pop-badge.burnt{background:rgba(142,68,173,0.4);color:#e8daef;border:1px solid var(--burnt)}
+.pop-badge.red{background:rgba(231,76,60,0.3);color:var(--red)}
+.pop-badge.yellow{background:rgba(241,196,15,0.25);color:var(--yellow)}
+.pop-badge.green{background:rgba(39,174,96,0.25);color:var(--green)}
+.pop-divider{border-top:1px solid rgba(0,243,255,0.2);margin:8px 0}
+.pop-section{font-size:.58rem;font-weight:800;color:var(--cyan);text-transform:uppercase;letter-spacing:.06em;padding:4px 0 2px}
+#hover-tooltip{position:fixed;pointer-events:none;background:rgba(5,7,12,0.95);border:1px solid var(--cyan);padding:4px 8px;border-radius:4px;font-size:.65rem;color:#fff;font-weight:700;display:none;z-index:90;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+/* ── Mejoras v4: legibilidad, panel central, alerta ociosidad ── */
+.tk-v{font-size:.85rem}
+.urg-ct-v{font-size:1.35rem}
+.ui-hrs{font-size:.68rem;padding:3px 7px}
+.pop-badge{font-size:.66rem;padding:3px 9px}
+.idle-banner{display:none;align-items:center;gap:8px;padding:6px 16px;background:rgba(245,158,11,0.14);border-bottom:1px solid rgba(245,158,11,0.4);color:#fbbf24;font-size:.68rem;font-weight:700;flex-shrink:0}
+.idle-banner.show{display:flex}
+.idle-banner .ib-icon{font-size:.9rem}
+.center-kpis{display:none;justify-content:center;align-items:stretch;gap:0;padding:6px 4px;background:#0a0c16;border-bottom:1px solid var(--border);flex-shrink:0}
+.center-kpis.show{display:flex}
+.ck-item{display:flex;flex-direction:column;align-items:center;padding:0 14px;border-right:1px solid var(--border)}
+.ck-item:last-child{border-right:none}
+.ck-v{font-size:1.1rem;font-weight:800;line-height:1.1;color:#f5f7ff}
+.ck-l{font-size:.52rem;color:#8b96b8;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;font-weight:600}
+</style>
+
+
+<script>
+/* Sin backend: estado en memoria para que las vistas funcionen en modo demo */
+(function(){var mem={};function g(n){return Promise.resolve({state:mem[n]||null});}
+function s(n,d){mem[n]=d;return Promise.resolve({state:d});}
+window.GRID={states:{get:g,set:s,patch:s},state:{get:function(){return g('_');},set:function(d){return s('_',d);},patch:function(d){return s('_',d);}}};})();
+</script>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="back" href="#">← CD-01</a>
+  <div class="sep"></div>
+  <div>
+    <div class="zone-title">Check-in 3D — CD-01</div>
+    <div class="zone-sub">WT 68-81 (HS) · WT 1-19 (DCI) · WT 20-50 (GM) · WT 51-67 (RK)</div>
+  </div>
+  <div class="topbar-kpis" id="topbar-kpis"></div>
+  <div class="live"><div class="ldot" id="ldot"></div><span id="clock-sm">--:--</span></div>
+</div>
+
+<div class="idle-banner" id="idle-banner"><span class="ib-icon">⚠️</span><span id="idle-banner-txt"></span></div>
+<div class="center-kpis" id="center-kpis"></div>
+
+<div class="main-wrapper">
+  <canvas id="three-canvas"></canvas>
+  <div id="loading-overlay">
+    <div class="spin"></div>
+    <div class="load-txt" id="load-txt">Cargando datos…</div>
+  </div>
+  <div class="nav-hint">↔ Arrastra · rueda para zoom</div>
+
+  <div class="urgent">
+    <div class="urg-head">
+      <div class="urg-title">CD-01 — Stage Monitor</div>
+      <div class="urg-ts" id="urg-ts"></div>
+    </div>
+    <div class="tab-btns">
+      <button class="tab-btn active" id="tbtn-urgentes" onclick="switchTab('urgentes')">⚡ Pallets</button>
+      <button class="tab-btn" id="tbtn-reps" onclick="switchTab('reps')">👷 Reps</button>
+    </div>
+    <div id="tab-urgentes">
+      <div class="urg-counters" id="urg-counters"></div>
+      <div class="urg-list" id="urg-list"></div>
+    </div>
+    <div id="tab-reps">
+      <div id="reps-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="hover-tooltip"></div>
+<div class="popover" id="popover">
+  <span class="pop-close" onclick="closePopover()">✕</span>
+  <div class="pop-title" id="pop-title"></div>
+  <div id="pop-body"></div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const GRID_DOC_ID  = 'YOUR_DOCUMENT_ID';  // Doc de la página Grid
+// Doc donde viven los datasets (mismo doc que la página)
+const DATA_DOC_ID  = 'YOUR_DOCUMENT_ID';
+// URL del documento: 
+const DATASET_STAGE = 'stage_data';   // Query 1: pallets en stage
+const DATASET_REPS  = 'reps_data';    // Query 2: reps + totes por bancada (agrupado en N8N)
+
+// ─── SLA THRESHOLDS — Check-in CD-01 (acumulado desde llegada a IS) ──────────
+// Presupuesto de pipeline: Stage 24h + Check-in 12h + Putaway 12h.
+// Estas horas son ACUMULADAS desde que el pallet llegó a IS (no desde que entró a checkin):
+// <30h = VERDE | 30-33h = AMARILLO | 33-36h = ROJO | ≥36h = QUEMADO
+// El timer SLA se detiene los domingos (ya calculado en BQ, usamos HORAS_EN_STAGE_SLA)
+function ageBucket(h) {
+  if (h < 30) return 'green';
+  if (h < 33) return 'yellow';
+  if (h < 36) return 'red';
+  return 'burnt';
+}
+const BUCKET_HEX = { green:0x27ae60, yellow:0xf1c40f, red:0xe74c3c, burnt:0x8e44ad };
+const BKT_LABEL  = { green:'Verde <30h', yellow:'Atención 30-33h', red:'Rojo 33-36h', burnt:'Quemado ≥36h' };
+
+// ─── MAPA DE SEMAFORO BQ → bucket interno ────────────────────────────────────
+const SEMAFORO_MAP = { QUEMADO:'burnt', ROJO:'red', AMARILLO:'yellow', VERDE:'green' };
+
+// ─── COLORES POR ZONA ──────────────────────────────────────────────────────────
+const ZONE_COLOR = { HS:'#3498db', DCI:'#f39c12', GM:'#10b981', RK:'#f59e0b' };
+
+// ─── SECUENCIA BANCADAS WT ────────────────────────────────────────────────────
+const wtSequence = [];
+for (let i=68;i<=81;i++) wtSequence.push({id:i, zone:'HS',  color:'#3498db'});
+for (let i=1; i<=19;i++) wtSequence.push({id:i, zone:'DCI', color:'#f39c12'});
+for (let i=20;i<=50;i++) wtSequence.push({id:i, zone:'GM',  color:'#10b981'});
+for (let i=51;i<=67;i++) wtSequence.push({id:i, zone:'RK',  color:'#f59e0b'});
+const totalBancadas = wtSequence.length;
+
+// ─── DATOS DE REPS (global, cargado desde Grid State) ────────────────────────
+let repsMap = new Map(); // bancada_number → { repLdap, repUserId, totesTotal, totesCodigos[], toteActual }
+
+// ─── PARSEO POSICIÓN WT ───────────────────────────────────────────────────────
+// "WT-0-003-000-00-00" → bancada 3  |  "WT-03" → bancada 3
+function parseWTBancada(pos) {
+  if (!pos) return null;
+  const p = String(pos).split('-');
+  if (p[0] !== 'WT') return null;
+  if (p.length === 2) return parseInt(p[1]);     // "WT-03"
+  if (p.length >= 4)  return parseInt(p[2]);     // "WT-0-003-..."
+  return null;
+}
+
+// ─── DATOS SINTÉTICOS (fallback demo) ────────────────────────────────────────
+const SYNTH_SELLERS = ['Samsung','LG Store','Motorola','Xiaomi','Philips','Sony','Whirlpool','Nestlé'];
+function synthHours(bancada, i) {
+  const seed = (bancada*97 + i*31 + 3) % 100;
+  if (seed < 50) return 2  + (seed % 13);
+  if (seed < 75) return 16 + (seed % 4);
+  if (seed < 90) return 20 + (seed % 4);
+  return 24 + (seed % 4);
+}
+
+// ─── CARGA DESDE GRID DATASET (N8N sube datos aquí) ──────────────────────────
+// Flujo N8N: POST /datasets/{name}/upload-url → PUT data → POST publish
+// Flujo HTML: GET /datasets/{name} → meta.download_url → GET data array
+async function loadDataset(datasetName) {
+  try {
+    // 1. Obtener metadata del dataset (contiene download_url)
+    const metaRes = await fetch(
+      `https://YOUR_DATA_HOST/api/v1/documents/${DATA_DOC_ID}/datasets/${datasetName}`
+    );
+    if (!metaRes.ok) {
+      console.warn(`[Dataset] ${datasetName} meta HTTP ${metaRes.status}`);
+      return null;
+    }
+    const meta = await metaRes.json();
+    if (!meta.download_url) {
+      console.warn(`[Dataset] ${datasetName}: sin download_url`, meta);
+      return null;
+    }
+    // 2. Descargar el array de datos
+    const dataRes = await fetch(meta.download_url);
+    if (!dataRes.ok) {
+      console.warn(`[Dataset] ${datasetName} download HTTP ${dataRes.status}`);
+      return null;
+    }
+    const json = await dataRes.json();
+    // Normalizar: array directo o envuelto en { data: [...] } / { rows: [...] }
+    if (Array.isArray(json)) return json;
+    return json.data || json.rows || [];
+  } catch(e) {
+    console.warn(`[Dataset] ${datasetName} excepción:`, e);
+    return null;
+  }
+}
+
+// ─── CARGA DESDE GRID STATES (legacy, no usada) ──────────────────────────────
+async function loadFromGridState(stateName) {
+  try {
+    const result = await window.GRID.states.get(stateName);
+    if (!result || !result.state) return null;
+    return Array.isArray(result.state) ? result.state : null;
+  } catch(e) {
+    console.warn(`[GridState] ${stateName}:`, e);
+    return null;
+  }
+}
+
+// ─── PROCESAMIENTO QUERY 1: Pallets Stage ─────────────────────────────────────
+// N8N pushea los rows nativos de la Query 1:
+// { PALLET_ID, STAGE_ADDRESS_ID, ZONA, PALLET_STATUS, HORAS_EN_STAGE_SLA,
+//   HORAS_EN_STAGE_REAL, SEMAFORO_SLA, SELLER, SELLER_TYPE, FAMILIA,
+//   UNIDADES_DECLARADAS, ES_DCI, INBOUND_ID, DOCK_WMS, OPERARIO_LDAP, PATENTE, TIPO }
+function processStageData(rawRows) {
+  const byBancada = new Map();
+  rawRows.forEach(row => {
+    const addr = row.STAGE_ADDRESS_ID;
+    if (!addr) return;
+    const bancada = parseWTBancada(addr);
+    if (!bancada) return;  // Solo WT (bancada), ignorar DK y SI por ahora
+
+    if (!byBancada.has(bancada)) byBancada.set(bancada, []);
+
+    const hrs   = parseFloat(row.HORAS_EN_STAGE_SLA ?? row.HORAS_EN_STAGE_REAL) || 0;
+    const bucket = (row.SEMAFORO_SLA && SEMAFORO_MAP[row.SEMAFORO_SLA]) || ageBucket(hrs);
+
+    byBancada.get(bancada).push({
+      PALLET_ID:     row.PALLET_ID || addr,
+      STAGE_ADDRESS: addr,
+      bancada,
+      zona:          row.ZONA || 'BANCADA',
+      status:        row.PALLET_STATUS || '—',
+      hoursInStage:  hrs,
+      hoursReal:     parseFloat(row.HORAS_EN_STAGE_REAL) || 0,
+      ageBucket:     bucket,
+      seller:        row.SELLER || '—',
+      sellerType:    row.SELLER_TYPE || '—',
+      familia:       row.FAMILIA || '—',
+      unidades:      parseInt(row.UNIDADES_DECLARADAS) || 0,
+      esDCI:         row.ES_DCI || '—',
+      inboundId:     row.INBOUND_ID || '—',
+      dockWMS:       row.DOCK_WMS || '—',
+      operarioLdap:  row.OPERARIO_LDAP || '—',
+      patente:       row.PATENTE || '—',
+      tipo:          row.TIPO || '—',
+    });
+  });
+  return byBancada;
+}
+
+// ─── PROCESAMIENTO QUERY 2: Reps + Totes ─────────────────────────────────────
+// Maneja DOS formatos posibles:
+//   A) Agrupado (AGRUPAR REPS code node):
+//      { BANCADA, OPERARIO_LDAP, TOTES_TOTAL, TOTE_ACTIVO, TOTES_CODIGOS }
+//   B) Raw (aggregate simple — 1 fila por tote):
+//      { BANCADA, OPERARIO_LDAP, OPERARIO_USER_ID, TOTE_DESTINO, CHK_STATUS }
+function processRepsData(rawRows) {
+  const map = new Map();
+
+  // Detectar si son rows raw (tienen TOTE_DESTINO) o pre-agrupados (tienen TOTES_TOTAL)
+  const isRaw = rawRows.length > 0 && ('TOTE_DESTINO' in rawRows[0]) && !('TOTES_TOTAL' in rawRows[0]);
+
+  if (isRaw) {
+    // Formato B: agrupar en el HTML
+    const byBancada = {};
+    rawRows.forEach(row => {
+      const b = row.BANCADA;
+      if (!b) return;
+      if (!byBancada[b]) {
+        byBancada[b] = {
+          BANCADA: b,
+          OPERARIO_USER_ID: String(row.OPERARIO_USER_ID || ''),
+          OPERARIO_LDAP:    row.OPERARIO_LDAP || '—',
+          TOTES_TOTAL:      0,
+          TOTE_ACTIVO:      null,
+          TOTES_CODIGOS:    []
+        };
+      }
+      byBancada[b].TOTES_TOTAL++;
+      if (row.TOTE_DESTINO) byBancada[b].TOTES_CODIGOS.push(row.TOTE_DESTINO);
+      if (row.CHK_STATUS === 'WORKING') byBancada[b].TOTE_ACTIVO = row.TOTE_DESTINO;
+    });
+    rawRows = Object.values(byBancada);
+  }
+
+  // Formato A (o ya agrupado desde B)
+  rawRows.forEach(row => {
+    const bancada = parseWTBancada(row.BANCADA || row.WT || '');
+    if (!bancada) return;
+    let codigos = [];
+    if (row.TOTES_CODIGOS) {
+      if (Array.isArray(row.TOTES_CODIGOS)) {
+        codigos = row.TOTES_CODIGOS;
+      } else {
+        try { codigos = JSON.parse(row.TOTES_CODIGOS); }
+        catch { codigos = String(row.TOTES_CODIGOS).split(',').map(s=>s.trim()).filter(Boolean); }
+      }
+    }
+    map.set(bancada, {
+      repUserId:    String(row.OPERARIO_USER_ID || ''),
+      repLdap:      row.OPERARIO_LDAP || '—',
+      totesTotal:   parseInt(row.TOTES_TOTAL || 0),
+      toteActivo:   row.TOTE_ACTIVO || row.TOTE_DESTINO || null,
+      totesCodigos: codigos,
+    });
+  });
+  return map;
+}
+
+// ─── THREE.JS SETUP ──────────────────────────────────────────────────────────
+const canvas   = document.getElementById('three-canvas');
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0e18);
+
+const camera   = new THREE.PerspectiveCamera(45, (window.innerWidth-275)/window.innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setSize(window.innerWidth-275, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const fillLight = new THREE.HemisphereLight(0xbfd9ff, 0x14161f, 0.55);
+scene.add(fillLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(30, 50, 40);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+scene.add(dirLight);
+
+const palletBaseGeo  = new THREE.BoxGeometry(0.9, 0.12, 0.9);
+const palletWoodMat  = new THREE.MeshLambertMaterial({ color:0x7a4d21 });
+const matBlackSkin   = new THREE.MeshStandardMaterial({ color:0x222222, roughness:0.8 });
+const matYellowShirt = new THREE.MeshStandardMaterial({ color:0xfacc15, roughness:0.4 });
+const matYellowCap   = new THREE.MeshStandardMaterial({ color:0xeab308, roughness:0.3 });
+const matVestStripe  = new THREE.MeshStandardMaterial({ color:0xe2e8f0, roughness:0.5, emissive:0x333333, emissiveIntensity:0.15 });
+const matToteWall    = new THREE.MeshStandardMaterial({ color:0xeab308, roughness:0.3, metalness:0.1 });
+const matProduct      = new THREE.MeshStandardMaterial({ color:0xec4899, roughness:0.2, emissive:0x831843, emissiveIntensity:0.5 });
+const matConveyorBed = new THREE.MeshStandardMaterial({ color:0x1c2233, roughness:0.6, metalness:0.2 });
+const matRoller      = new THREE.MeshStandardMaterial({ color:0x475569, roughness:0.4, metalness:0.4 });
+
+const interactableMeshes = [];
+let   allPallets         = [];
+let   activeWorkers      = [];  // workers activos (empacando, tienen totes en la última hora)
+let   conveyorBelt       = null; // textura del conveyor GM, se anima en animate()
+let   conveyorInfo       = null; // {xMin,xMax,y,z} — se llena en buildScene si existe zona GM
+let   conveyorTotes      = [];   // totes que viajan por el conveyor (spawMaría periódico)
+let   nextToteSpawnT     = 2;    // próximo instante (clock3) para largar un tote
+
+// ─── TEXTURA PLACA WT ────────────────────────────────────────────────────────
+function createWTWallTexture(text, zoneText, colorHex) {
+  const cv = document.createElement('canvas'); cv.width=512; cv.height=256;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,512,256);
+  ctx.strokeStyle=colorHex; ctx.lineWidth=16; ctx.strokeRect(8,8,496,240);
+  ctx.fillStyle=colorHex; ctx.fillRect(20,20,472,50);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 32px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(zoneText, 256, 45);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 95px monospace';
+  ctx.fillText(text, 256, 160);
+  const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter; return tex;
+}
+
+// ─── TOTE (canasto abierto amarillo) ─────────────────────────────────────────
+function buildTote() {
+  const tote = new THREE.Group();
+  const b  = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.025,0.32), matToteWall); b.position.y=0.012; b.castShadow=true; tote.add(b);
+  const wN = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.22,0.025), matToteWall); wN.position.set(0,0.11,-0.148);
+  const wS = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.22,0.025), matToteWall); wS.position.set(0,0.11, 0.148);
+  const wW = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.22,0.32), matToteWall); wW.position.set(-0.2,0.11,0);
+  const wE = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.22,0.32), matToteWall); wE.position.set(0.2,0.11,0);
+  [wN,wS,wW,wE].forEach(w=>{ w.castShadow=true; tote.add(w); });
+  return tote;
+}
+
+// ─── TEXTURA MINI-LABEL TOTES ─────────────────────────────────────────────────
+function createTotesLabel(count, ldap) {
+  const cv = document.createElement('canvas'); cv.width=256; cv.height=100;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,256,100);
+  ctx.fillStyle = 'rgba(0,243,255,0.12)';
+  roundRect(ctx,4,4,248,92,10); ctx.fill();
+  ctx.strokeStyle = '#00f3ff'; ctx.lineWidth = 2;
+  roundRect(ctx,4,4,248,92,10); ctx.stroke();
+  ctx.fillStyle = '#00f3ff'; ctx.font = 'bold 38px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(count), 128, 40);
+  ctx.fillStyle = 'rgba(200,220,255,0.7)'; ctx.font = '14px sans-serif';
+  const label = ldap.length > 14 ? ldap.slice(0,14)+'…' : ldap;
+  ctx.fillText(label, 128, 74);
+  const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter; return tex;
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+
+// ─── CONSTRUCCIÓN ESCENA ──────────────────────────────────────────────────────
+let totalWidth3D = 0;
+let cameraXTarget, cameraXCurrent;
+let viewMode = 'bancadas';
+const BANCADA_WIDTH = 1.3 * 1.5;
+
+const cameraAngles = {
+  general:  { y:30, z:40, lookZ:20 },
+  bancadas: { y:10, z:15, lookZ:22 },
+};
+let cameraYCurrent = cameraAngles.bancadas.y;
+let cameraZCurrent = cameraAngles.bancadas.z;
+let lookZCurrent   = cameraAngles.bancadas.lookZ;
+
+// Anillo CYAN — marca el pallet seleccionado
+const selectionGroup = new THREE.Group();
+const ringMesh = new THREE.Mesh(new THREE.RingGeometry(0.6,0.85,32), new THREE.MeshBasicMaterial({color:0x00f3ff,side:THREE.DoubleSide,transparent:true,opacity:0.9}));
+ringMesh.rotation.x=-Math.PI/2; ringMesh.position.y=0.02; selectionGroup.add(ringMesh);
+const arrowMesh = new THREE.Mesh(new THREE.ConeGeometry(0.35,0.7,4), new THREE.MeshBasicMaterial({color:0x00f3ff}));
+arrowMesh.rotation.x=Math.PI; arrowMesh.position.y=2.5; selectionGroup.add(arrowMesh);
+selectionGroup.visible=false; scene.add(selectionGroup);
+
+// Anillo AMBER — marca al rep (monito) de la bancada seleccionada
+const repSelectionGroup = new THREE.Group();
+const repRingMesh = new THREE.Mesh(new THREE.RingGeometry(0.45,0.68,32), new THREE.MeshBasicMaterial({color:0xf59e0b,side:THREE.DoubleSide,transparent:true,opacity:0.9}));
+repRingMesh.rotation.x=-Math.PI/2; repRingMesh.position.y=0.02; repSelectionGroup.add(repRingMesh);
+const repArrowMesh = new THREE.Mesh(new THREE.ConeGeometry(0.28,0.55,4), new THREE.MeshBasicMaterial({color:0xf59e0b}));
+repArrowMesh.rotation.x=Math.PI; repArrowMesh.position.y=3.2; repSelectionGroup.add(repArrowMesh);
+repSelectionGroup.visible=false; scene.add(repSelectionGroup);
+
+function buildScene(byBancada, isSynth) {
+  const toRemove = scene.children.filter(c => c !== selectionGroup && !(c instanceof THREE.Light));
+  toRemove.forEach(c => scene.remove(c));
+  interactableMeshes.length = 0;
+  allPallets.length = 0;
+  activeWorkers.length = 0;
+  conveyorInfo = null;
+  conveyorTotes.forEach(ct => scene.remove(ct.mesh));
+  conveyorTotes.length = 0;
+  let gmXMin = Infinity, gmXMax = -Infinity;
+
+  totalWidth3D = totalBancadas * BANCADA_WIDTH + 20;
+  const wallStart = 10;
+
+  // Suelo
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(totalWidth3D+20,18), new THREE.MeshLambertMaterial({color:0x070913}));
+  floor.rotation.x=-Math.PI/2; floor.position.set(totalWidth3D/2,0.001,23); floor.receiveShadow=true; scene.add(floor);
+
+  // Muro trasero
+  const wallW = totalBancadas * BANCADA_WIDTH;
+  const wallCx = wallStart + wallW/2;
+  const wallZ = 26.5;
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(wallW,3.5), new THREE.MeshLambertMaterial({color:0x0d0f1b,side:THREE.DoubleSide}));
+  backWall.position.set(wallCx,1.75,wallZ); backWall.receiveShadow=true; scene.add(backWall);
+
+  wtSequence.forEach((item, index) => {
+    const wtId        = `WT-${String(item.id).padStart(2,'0')}`;
+    const revIdx      = totalBancadas - 1 - index;
+    const xPos        = wallStart + (revIdx + 0.5) * BANCADA_WIDTH;
+    const colorHex    = item.color;
+
+    const wtPallets   = byBancada.get(item.id) || [];
+    const wtOccupied  = wtPallets.length > 0;
+    const repInfo     = repsMap.get(item.id);
+
+    if (item.zone === 'GM') { gmXMin = Math.min(gmXMin, xPos); gmXMax = Math.max(gmXMax, xPos); }
+
+    // Cartel de bancada
+    const plateTex = createWTWallTexture(wtId, item.zone, colorHex);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.5), new THREE.MeshBasicMaterial({map:plateTex,side:THREE.DoubleSide}));
+    plate.position.set(xPos,2.65,wallZ-0.1); plate.scale.x=-1; scene.add(plate);
+
+    // Label totes del rep (si hay datos)
+    if (repInfo && repInfo.totesTotal > 0) {
+      const toteTex = createTotesLabel(repInfo.totesTotal, repInfo.repLdap);
+      const toteMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.92,0.36), new THREE.MeshBasicMaterial({map:toteTex,side:THREE.DoubleSide,transparent:true}));
+      toteMesh.position.set(xPos,1.9,wallZ-0.08); toteMesh.scale.x=-1; scene.add(toteMesh);
+    }
+
+    // Anillo de estado SLA
+    let ringColor = 0x475569, ringOpacity = 0.08;
+    if (wtOccupied) {
+      const worst = wtPallets.reduce((w,p) => {
+        const pri={green:0,yellow:1,red:2,burnt:3};
+        return pri[p.ageBucket]>pri[w]?p.ageBucket:w;
+      }, 'green');
+      ringColor=BUCKET_HEX[worst]; ringOpacity=0.35;
+    }
+    const ringGeo = new THREE.RingGeometry(0.5,0.68,32); ringGeo.rotateX(-Math.PI/2);
+    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({color:ringColor,side:THREE.DoubleSide,transparent:true,opacity:ringOpacity}));
+    ring.position.set(xPos,0.03,23.5); scene.add(ring);
+
+    if (!wtOccupied && !isSynth) {
+      const emp = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.8,0.6), new THREE.MeshStandardMaterial({color:0x0f172a,roughness:0.9,transparent:true,opacity:0.3}));
+      emp.position.set(xPos,0.4,23.5); scene.add(emp);
+      return;
+    }
+
+    const visPallets = (isSynth && wtPallets.length===0)
+      ? [0,1,2].map(pi => {
+          const h = synthHours(item.id,pi);
+          return { PALLET_ID:`SYN-WT${item.id}-${pi}`, bancada:item.id, hoursInStage:h, ageBucket:ageBucket(h), seller:SYNTH_SELLERS[(item.id+pi)%SYNTH_SELLERS.length], familia:'GM', sellerType:'3P', esDCI:'NO_DCI', inboundId:'—', dockWMS:'—', operarioLdap:'—', status:'STAGE_IN', zona:'BANCADA', unidades:0 };
+        }).sort((a,b) => b.hoursInStage - a.hoursInStage)
+      : [...wtPallets].sort((a,b) => (b.hoursInStage||0) - (a.hoursInStage||0)).slice(0,3);
+
+    // Pallets — FIFO: el más viejo (primero anclado) va más cerca del rep (z más alto)
+    const zPos = [22.4, 21.2, 20.0];
+    visPallets.forEach((p,pi) => {
+      const z = zPos[pi] || 20+pi*1.2;
+      const wb = new THREE.Mesh(palletBaseGeo, palletWoodMat);
+      wb.position.set(xPos,0.06,z); wb.castShadow=true; wb.receiveShadow=true; scene.add(wb);
+
+      const bkt = p.ageBucket;
+      const pm  = new THREE.Mesh(new THREE.BoxGeometry(0.85,0.75,0.85), new THREE.MeshStandardMaterial({color:BUCKET_HEX[bkt],roughness:0.35,metalness:0.1}));
+      pm.position.set(xPos,0.49,z); pm.castShadow=true; pm.receiveShadow=true;
+      pm.userData = { ...p, wtId, zone:item.zone, klass:item.zone, andenRange:wtId, xPos, bancadaId:item.id };
+      scene.add(pm);
+      interactableMeshes.push(pm);
+      allPallets.push({ ...p, wtId, klass:item.zone, andenRange:wtId, xPos, bancadaId:item.id });
+    });
+
+    // Mesa
+    const mesa = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.06,0.65), new THREE.MeshStandardMaterial({color:0xf8fafc,roughness:0.2}));
+    mesa.position.set(xPos,0.85,23.6); mesa.castShadow=true; scene.add(mesa);
+    [[-0.65,0.42,-0.28],[0.65,0.42,-0.28],[-0.65,0.42,0.28],[0.65,0.42,0.28]].forEach(lp=>{
+      const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.84),new THREE.MeshStandardMaterial({color:0x1e293b}));
+      leg.position.set(xPos+lp[0],lp[1],23.6+lp[2]); leg.castShadow=true; scene.add(leg);
+    });
+
+    // Operario — agrupado para animación de baile
+    const repUD = { isRep:true, bancadaId:item.id, xPos, z:24.3 };
+    const hasRep = repsMap.has(item.id) && (repsMap.get(item.id).totesTotal > 0);
+
+    const wGroup = new THREE.Group();
+    wGroup.position.set(xPos, 0, 0);
+    wGroup.userData = { baseX:xPos, phase: item.id * 1.73 };  // fase distinta por bancada
+    scene.add(wGroup);
+    if (hasRep) activeWorkers.push(wGroup);
+
+    const torso=new THREE.Mesh(new THREE.BoxGeometry(0.38,0.48,0.22),matYellowShirt);
+    torso.position.set(0,1.1,24.3); torso.castShadow=true; torso.userData=repUD; wGroup.add(torso);
+    interactableMeshes.push(torso);
+    const vest=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.09,0.24),matVestStripe);
+    vest.position.set(0,1.16,24.3); wGroup.add(vest);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.12,20,20),matBlackSkin);
+    head.position.set(0,1.45,24.3); head.castShadow=true; head.userData=repUD; wGroup.add(head);
+    interactableMeshes.push(head);
+    const cap=new THREE.Mesh(new THREE.SphereGeometry(0.13,20,20,0,Math.PI*2,0,Math.PI/2),matYellowCap);
+    cap.position.set(0,1.47,24.3); cap.userData=repUD; wGroup.add(cap);
+    interactableMeshes.push(cap);
+    const armL=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.35,10),matBlackSkin);
+    armL.position.set(-0.22,1.05,24.2); armL.rotation.x=-Math.PI/3; armL.castShadow=true; wGroup.add(armL);
+    const armPivot=new THREE.Group();
+    armPivot.position.set(0.22,1.2,24.15);
+    wGroup.add(armPivot);
+    const armR=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.35,10),matBlackSkin);
+    armR.position.set(0,-0.15,0.05); armR.rotation.x=-Math.PI/3; armR.castShadow=true; armPivot.add(armR);
+    wGroup.userData.armPivot = armPivot;
+
+    // Tote amarillo sobre la mesa + mini producto (solo bancadas con rep activo)
+    if (hasRep) {
+      const tote = buildTote();
+      tote.position.set(0.45, 0.88, 23.55);
+      wGroup.add(tote);
+      const product=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,0.12),matProduct);
+      product.position.set(0.45,1.12,23.55); product.castShadow=true; wGroup.add(product);
+      wGroup.userData.product      = product;
+      wGroup.userData.productStart = new THREE.Vector3(0.45,1.12,23.55);
+      wGroup.userData.productEnd   = new THREE.Vector3(0.45,0.97,23.55);
+    }
+  });
+
+  // ── Conveyor detrás de la zona GM (WT 20-50) ──────────────────────────
+  if (gmXMax > gmXMin) {
+    const convLen = (gmXMax - gmXMin) + BANCADA_WIDTH;
+    const convCx  = (gmXMin + gmXMax) / 2;
+    const convZ   = wallZ - 1.35;
+    const bedGeo  = new THREE.BoxGeometry(convLen, 0.28, 0.62);
+    const bed = new THREE.Mesh(bedGeo, matConveyorBed);
+    bed.position.set(convCx, 0.9, convZ); bed.castShadow = true; bed.receiveShadow = true;
+    scene.add(bed);
+    const stripeCv = document.createElement('canvas'); stripeCv.width=128; stripeCv.height=16;
+    const sctx = stripeCv.getContext('2d');
+    sctx.fillStyle='#1c2233'; sctx.fillRect(0,0,128,16);
+    sctx.fillStyle='#f1c40f';
+    for (let sx=-16; sx<128; sx+=16) { sctx.save(); sctx.translate(sx,0); sctx.beginPath(); sctx.moveTo(0,16); sctx.lineTo(8,0); sctx.lineTo(16,0); sctx.lineTo(8,16); sctx.closePath(); sctx.fill(); sctx.restore(); }
+    const stripeTex = new THREE.CanvasTexture(stripeCv);
+    stripeTex.wrapS = THREE.RepeatWrapping; stripeTex.repeat.set(Math.max(1,Math.round(convLen*1.5)), 1);
+    const beltTop = new THREE.Mesh(new THREE.PlaneGeometry(convLen,0.6), new THREE.MeshBasicMaterial({map:stripeTex}));
+    beltTop.rotation.x=-Math.PI/2; beltTop.position.set(convCx,1.045,convZ); scene.add(beltTop);
+    conveyorBelt = stripeTex;
+    conveyorInfo = { xMin: gmXMin - BANCADA_WIDTH/2 + 0.3, xMax: gmXMax + BANCADA_WIDTH/2 - 0.3, y: 1.16, z: convZ };
+    const rollerCount = Math.max(2, Math.round(convLen/2.6));
+    for (let ri=0; ri<=rollerCount; ri++) {
+      const rx = gmXMin - BANCADA_WIDTH/2 + (convLen/rollerCount)*ri;
+      const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.7,10), matRoller);
+      roller.rotation.z = Math.PI/2; roller.position.set(rx,0.78,convZ); roller.castShadow=true;
+      scene.add(roller);
+    }
+  }
+
+  cameraXTarget  = wallStart + (totalBancadas - 2) * BANCADA_WIDTH;
+  cameraXCurrent = cameraXTarget;
+}
+
+// ─── UI: TAB STAGE (Urgentes) ─────────────────────────────────────────────────
+function updateStageUI(pallets, isSynth) {
+  const cnt = {green:0,yellow:0,red:0,burnt:0};
+  pallets.forEach(p => cnt[p.ageBucket]++);
+
+  document.getElementById('topbar-kpis').innerHTML = `
+    <div class="tk"><div class="tk-dot" style="background:var(--burnt)"></div><span class="tk-v" style="color:var(--burnt)">${cnt.burnt}</span></div>
+    <div class="tk"><div class="tk-dot" style="background:var(--red)"></div><span class="tk-v" style="color:var(--red)">${cnt.red}</span></div>
+    <div class="tk"><div class="tk-dot" style="background:var(--yellow)"></div><span class="tk-v" style="color:var(--yellow)">${cnt.yellow}</span></div>
+    <div class="tk"><div class="tk-dot" style="background:var(--green)"></div><span class="tk-v" style="color:var(--green)">${cnt.green}</span></div>
+    <span style="font-size:.65rem;color:var(--sub);margin-left:4px">${pallets.length} pallets${isSynth?' (demo)':''}</span>
+  `;
+  document.getElementById('urg-counters').innerHTML = `
+    <div class="urg-ct burnt"><div class="urg-ct-v">${cnt.burnt}</div><div class="urg-ct-l">≥24h QUEMADO</div></div>
+    <div class="urg-ct red"><div class="urg-ct-v">${cnt.red}</div><div class="urg-ct-l">20-24h ROJO</div></div>
+    <div class="urg-ct yellow"><div class="urg-ct-v">${cnt.yellow}</div><div class="urg-ct-l">16-20h AMARI.</div></div>
+    <div class="urg-ct green"><div class="urg-ct-v">${cnt.green}</div><div class="urg-ct-l">&lt;16h VERDE</div></div>
+  `;
+  document.getElementById('urg-ts').textContent = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+
+  const sorted = [...pallets].sort((a,b)=>b.hoursInStage-a.hoursInStage);
+  const ul = document.getElementById('urg-list');
+  ul.innerHTML='';
+  sorted.forEach(p => {
+    const li = document.createElement('div');
+    li.className = 'urg-item ' + p.ageBucket;
+    const zc = ZONE_COLOR[p.klass]||'#666';
+    const pid = p.PALLET_ID||'—';
+    li.innerHTML=`
+      <div class="ui-row1">
+        <span class="ui-hrs ${p.ageBucket}">${(p.hoursInStage||0).toFixed(1)}h</span>
+        <span class="ui-id">${pid.length>16?pid.slice(0,16)+'…':pid}</span>
+        <span class="ui-range">${p.andenRange||''}</span>
+      </div>
+      <div class="ui-row2">
+        <span class="ui-klass" style="background:${zc}33;color:${zc}">${p.klass||'?'}</span>
+        <span class="ui-seller">${p.seller||'—'} ${p.familia!='—'?'· '+p.familia:''}</span>
+      </div>
+    `;
+    li.addEventListener('click', ()=>showPopover(p));
+    ul.appendChild(li);
+  });
+}
+
+// ─── UI: TAB REPS (Bancada) ───────────────────────────────────────────────────
+function updateRepsUI(map) {
+  const el = document.getElementById('reps-list');
+  if (!map || map.size === 0) {
+    el.innerHTML = `<div class="reps-empty">Sin datos de reps.<br>Esperando próxima ejecución de N8N…<br><br><span style="font-size:.55rem;opacity:.5">↻ cada 10 min</span></div>`;
+    return;
+  }
+  const entries = [...map.entries()].sort((a,b)=>b[1].totesTotal-a[1].totesTotal);
+  el.innerHTML = entries.map(([bancada,r])=>{
+    const wt   = wtSequence.find(w=>w.id===bancada);
+    const zone = wt?wt.zone:'?';
+    const col  = wt?wt.color:'#666';
+    const codes = r.totesCodigos.slice(0,5).join(' · ') + (r.totesCodigos.length>5?` +${r.totesCodigos.length-5}`:'');
+    const actiLabel = r.toteActivo ? `<span style="color:var(--cyan);font-size:.54rem;font-family:monospace">${r.toteActivo}</span>` : '';
+    return `<div class="rep-item">
+      <div class="rep-top">
+        <span class="rep-zone" style="background:${col}22;color:${col};border:1px solid ${col}44">${zone}</span>
+        <span class="rep-wt">WT-${String(bancada).padStart(2,'0')}</span>
+        <span class="rep-name">${r.repLdap}</span>
+      </div>
+      <div class="rep-stats">
+        <span class="rep-stat">Totes: <b>${r.totesTotal}</b></span>
+        ${actiLabel?`<span class="rep-stat">Ahora: ${actiLabel}</span>`:''}
+      </div>
+      ${codes?`<div class="rep-totes-codes">${codes}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ─── UI: PANEL CENTRAL DE KPIs (reps por zona, pallets, operativos, unidades) ──
+function renderCenterKPIs(pallets) {
+  const repsByZone = { HS:0, DCI:0, GM:0, RK:0 };
+  let repsOperativos = 0;
+  repsMap.forEach((r, bancada) => {
+    const wt = wtSequence.find(w => w.id === bancada);
+    if (wt && repsByZone.hasOwnProperty(wt.zone)) repsByZone[wt.zone]++;
+    if (r.totesTotal > 0) repsOperativos++;
+  });
+  const totalReps = repsByZone.HS + repsByZone.DCI + repsByZone.GM + repsByZone.RK;
+  const unidadesAncladas = pallets.reduce((s,p) => s + (p.unidades||0), 0);
+
+  document.getElementById('center-kpis').classList.add('show');
+  document.getElementById('center-kpis').innerHTML = `
+    <div class="ck-item"><div class="ck-v">${totalReps}</div><div class="ck-l">Reps totales</div></div>
+    <div class="ck-item"><div class="ck-v" style="color:#3498db">${repsByZone.HS}</div><div class="ck-l">HS</div></div>
+    <div class="ck-item"><div class="ck-v" style="color:#f39c12">${repsByZone.DCI}</div><div class="ck-l">DCI</div></div>
+    <div class="ck-item"><div class="ck-v" style="color:#10b981">${repsByZone.GM}</div><div class="ck-l">GM</div></div>
+    <div class="ck-item"><div class="ck-v" style="color:#f59e0b">${repsByZone.RK}</div><div class="ck-l">RK</div></div>
+    <div class="ck-item"><div class="ck-v" style="color:var(--cyan)">${repsOperativos}</div><div class="ck-l">Operativos</div></div>
+    <div class="ck-item"><div class="ck-v">${pallets.length}</div><div class="ck-l">Pallets</div></div>
+    <div class="ck-item"><div class="ck-v">${unidadesAncladas.toLocaleString('es-CL')}</div><div class="ck-l">Unid. ancladas</div></div>
+  `;
+}
+
+// ─── OCIOSIDAD EXTENDIDA POR REP ──────────────────────────────────────────────
+// Cada refresh (~10 min) revisa si el rep de esa bancada procesó algo (totesTotal>0).
+// Si NO procesó nada 3 refreshes seguidos (~30 min), se marca como ociosidad extendida.
+// La racha se guarda en window.GRID.state (named state "idle_streaks") para sobrevivir
+// al auto-reload de la página cada 10 min — si no, el contador se perdería en cada recarga.
+const IDLE_STREAK_THRESHOLD = 3;
+async function computeIdleStreaks(map) {
+  let streaks = {};
+  try {
+    const res = await window.GRID.states.get('idle_streaks');
+    streaks = (res && res.state) || {};
+  } catch (e) { streaks = {}; }
+
+  const newStreaks = {};
+  const flagged = [];
+  map.forEach((r, bancada) => {
+    const key = String(bancada);
+    const prev = streaks[key] || 0;
+    const idleThisCycle = (r.totesTotal || 0) === 0;
+    const streak = idleThisCycle ? prev + 1 : 0;
+    newStreaks[key] = streak;
+    if (streak >= IDLE_STREAK_THRESHOLD && r.repLdap && r.repLdap !== '—') {
+      const wt = wtSequence.find(w => w.id === bancada);
+      flagged.push({ bancada, wtId:`WT-${String(bancada).padStart(2,'0')}`, ldap:r.repLdap, zone: wt?wt.zone:'?', streak });
+    }
+  });
+
+  try { await window.GRID.states.set('idle_streaks', newStreaks); }
+  catch (e) { console.warn('[IdleStreaks] no se pudo guardar el estado:', e); }
+
+  return flagged;
+}
+
+// ─── UI: ALERTA DE OCIOSIDAD EXTENDIDA (por rep) ──────────────────────────────
+function renderIdleBanner(idleReps) {
+  const banner = document.getElementById('idle-banner');
+  const txt = document.getElementById('idle-banner-txt');
+  if (!idleReps || !idleReps.length) { banner.classList.remove('show'); return; }
+  const items = idleReps.slice(0,6).map(r => `${r.ldap} (${r.wtId})`).join(', ');
+  const extra = idleReps.length > 6 ? ` +${idleReps.length-6} más` : '';
+  txt.textContent = `${idleReps.length} rep(s) con ociosidad extendida (${IDLE_STREAK_THRESHOLD} actualizaciones seguidas sin procesar, ~${IDLE_STREAK_THRESHOLD*10} min): ${items}${extra}`;
+  banner.classList.add('show');
+}
+
+// ─── UI: SWITCH TAB ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  const isStage = tab==='urgentes';
+  document.getElementById('tab-urgentes').style.display = isStage?'flex':'none';
+  document.getElementById('tab-reps').style.display     = isStage?'none':'block';
+  document.getElementById('tbtn-urgentes').classList.toggle('active', isStage);
+  document.getElementById('tbtn-reps').classList.toggle('active', !isStage);
+}
+
+// ─── INTERACCIÓN ─────────────────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse     = new THREE.Vector2();
+const tooltipEl = document.getElementById('hover-tooltip');
+let isDragging=false, prevMouseX=0;
+
+canvas.addEventListener('click', e=>{
+  if(isDragging)return;
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(interactableMeshes);
+  if(hits.length>0){
+    const obj=hits[0].object;
+    const wp=new THREE.Vector3();
+    obj.getWorldPosition(wp);
+    showPopover(obj.userData, wp);
+  }
+});
+
+canvas.addEventListener('mousemove', e=>{
+  if(isDragging)return;
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(interactableMeshes);
+  if(hits.length>0){
+    const p=hits[0].object.userData;
+    tooltipEl.style.display='block'; tooltipEl.style.left=(e.clientX+12)+'px'; tooltipEl.style.top=(e.clientY-20)+'px';
+    if(p.isRep){
+      const rep=repsMap.get(p.bancadaId)||{};
+      tooltipEl.innerHTML=`👷 <b>WT-${String(p.bancadaId).padStart(2,'0')}</b> · ${rep.repLdap||'Sin datos'} · ${rep.totesTotal||0} totes`;
+    } else {
+      tooltipEl.innerHTML=`<b>${p.PALLET_ID||p.wtId||'—'}</b> · ${(p.hoursInStage||0).toFixed(1)}h SLA · ${p.klass||''}`;
+    }
+  } else tooltipEl.style.display='none';
+});
+
+function showPopover(p, hitPos) {
+  const pop = document.getElementById('popover');
+
+  // ── 1. Fly camera to bancada ──────────────────────────────────────────────
+  if (p.xPos !== undefined) cameraXTarget = p.xPos;
+
+  // ── 2. Dual highlight: cyan ring en objeto + amber ring en rep ────────────
+  const xp = p.xPos ?? (hitPos ? hitPos.x : null);
+  if (xp !== null) {
+    if (p.isRep) {
+      // Clicked el monito → cyan ring en rep, amber ring oculto
+      selectionGroup.position.set(xp, 0, 24.3);
+      selectionGroup.visible = true;
+      repSelectionGroup.visible = false;
+    } else {
+      // Clicked un pallet → cyan ring en pallet, amber ring en rep
+      const pz = hitPos ? hitPos.z : 10;
+      selectionGroup.position.set(xp, 0, pz);
+      selectionGroup.visible = true;
+      repSelectionGroup.position.set(xp, 0, 24.3);
+      repSelectionGroup.visible = true;
+    }
+  }
+
+  // ── 3. Popover content ────────────────────────────────────────────────────
+  if (p.isRep) {
+    // ── POPOVER REP ──
+    const rep = repsMap.get(p.bancadaId) || {};
+    const ldap = rep.repLdap || '—';
+    const wtLabel = `WT-${String(p.bancadaId).padStart(2,'0')}`;
+    document.getElementById('pop-title').innerHTML = `
+      <span>👷 ${ldap}</span>
+      <span class="pop-badge green">${wtLabel}</span>
+    `;
+    const codigos = (rep.totesCodigos||[]).slice(0,5);
+    const unidadesRep = allPallets.filter(pl => pl.operarioLdap === ldap).reduce((s,pl)=>s+(pl.unidades||0),0);
+    const uph = unidadesRep; // ventana de datos = última hora
+    document.getElementById('pop-body').innerHTML = `
+      <div class="pop-row"><span class="pop-lbl">Bancada</span><span class="pop-val">${wtLabel}</span></div>
+      <div class="pop-row"><span class="pop-lbl">LDAP</span><span class="pop-val" style="font-family:monospace;color:var(--cyan)">${ldap}</span></div>
+      <div class="pop-row"><span class="pop-lbl">User ID</span><span class="pop-val">${rep.repUserId||'—'}</span></div>
+      <div class="pop-divider"></div>
+      <div class="pop-section">🗂️ Totes — última hora</div>
+      <div class="pop-row"><span class="pop-lbl">Total procesados</span><span class="pop-val"><b style="color:var(--cyan);font-size:.85rem">${rep.totesTotal||0}</b></span></div>
+      ${rep.toteActivo?`<div class="pop-row"><span class="pop-lbl">Tote activo</span><span class="pop-val" style="font-family:monospace;font-size:.58rem">${rep.toteActivo}</span></div>`:''}
+      ${codigos.length?`<div class="pop-row"><span class="pop-lbl">Últimos códigos</span><span class="pop-val" style="font-family:monospace;font-size:.52rem;line-height:1.4">${codigos.join('<br>')}${(rep.totesCodigos||[]).length>5?'…':''}</span></div>`:'<div class="pop-row" style="color:var(--sub);font-size:.6rem">Sin actividad en la última hora</div>'}
+      <div class="pop-divider"></div>
+      <div class="pop-section">⚡ Productividad</div>
+      <div class="pop-row"><span class="pop-lbl">UPH (unid./hora, est.)</span><span class="pop-val"><b style="color:var(--yellow);font-size:.85rem">${uph}</b></span></div>
+      <div class="pop-row"><span class="pop-lbl">Totes/hora</span><span class="pop-val">${rep.totesTotal||0}</span></div>
+    `;
+  } else {
+    // ── POPOVER PALLET ──
+    const pid = p.PALLET_ID||'—';
+    document.getElementById('pop-title').innerHTML = `
+      <span style="font-family:monospace;font-size:.72rem">${pid.length>22?pid.slice(0,22)+'…':pid}</span>
+      <span class="pop-badge ${p.ageBucket}">${BKT_LABEL[p.ageBucket]||p.ageBucket}</span>
+    `;
+
+    const rep = repsMap.get(p.bancada||p.bancadaId);
+    const repBlock = rep ? `
+      <div class="pop-divider"></div>
+      <div class="pop-section">👷 Rep en bancada</div>
+      <div class="pop-row"><span class="pop-lbl">LDAP</span><span class="pop-val" style="color:var(--yellow)">${rep.repLdap}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Totes (hora)</span><span class="pop-val"><b>${rep.totesTotal}</b></span></div>
+      ${rep.toteActivo?`<div class="pop-row"><span class="pop-lbl">Tote activo</span><span class="pop-val" style="font-family:monospace;font-size:.6rem">${rep.toteActivo}</span></div>`:''}
+      ${(rep.totesCodigos||[]).length?`<div class="pop-row"><span class="pop-lbl">Últimos totes</span><span class="pop-val" style="font-family:monospace;font-size:.54rem">${rep.totesCodigos.slice(0,3).join(', ')}${rep.totesCodigos.length>3?'…':''}</span></div>`:''}
+    ` : '';
+
+    document.getElementById('pop-body').innerHTML = `
+      <div class="pop-row"><span class="pop-lbl">Bancada</span><span class="pop-val">${p.andenRange||p.wtId||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Ubicación</span><span class="pop-val" style="font-family:monospace;font-size:.6rem">${p.STAGE_ADDRESS||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Inbound ID</span><span class="pop-val" style="font-family:monospace">${p.inboundId||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Horas SLA</span><span class="pop-val"><b style="color:var(--cyan)">${(p.hoursInStage||0).toFixed(1)} hs</b></span></div>
+      ${p.hoursReal&&p.hoursReal!==p.hoursInStage?`<div class="pop-row"><span class="pop-lbl">Horas reales</span><span class="pop-val">${p.hoursReal.toFixed(1)} hs</span></div>`:''}
+      <div class="pop-row"><span class="pop-lbl">Status</span><span class="pop-val">${p.status||'—'}</span></div>
+      <div class="pop-divider"></div>
+      <div class="pop-section">📦 Mercadería</div>
+      <div class="pop-row"><span class="pop-lbl">Seller</span><span class="pop-val">${p.seller||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Tipo</span><span class="pop-val">${p.sellerType||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Familia</span><span class="pop-val">${p.familia||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Unidades IS</span><span class="pop-val">${p.unidades||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">ES DCI</span><span class="pop-val" style="color:${p.esDCI==='DCI'?'var(--cyan)':'var(--sub)'}">${p.esDCI||'—'}</span></div>
+      <div class="pop-row"><span class="pop-lbl">Transporte</span><span class="pop-val">${p.tipo||'—'} ${p.patente&&p.patente!=='—'?'· '+p.patente:''}</span></div>
+      ${repBlock}
+    `;
+  }
+
+  pop.style.display='block'; pop.style.right='290px'; pop.style.bottom='20px';
+}
+function closePopover(){
+  document.getElementById('popover').style.display='none';
+  selectionGroup.visible=false;
+  repSelectionGroup.visible=false;
+}
+
+// ─── NAVEGACIÓN ───────────────────────────────────────────────────────────────
+canvas.addEventListener('mousedown', e=>{isDragging=true;prevMouseX=e.clientX;});
+window.addEventListener('mouseup',  ()=>isDragging=false);
+window.addEventListener('mousemove', e=>{if(!isDragging)return; cameraXTarget-=(e.clientX-prevMouseX)*0.06; prevMouseX=e.clientX;});
+canvas.addEventListener('wheel', e=>{e.preventDefault(); cameraXTarget+=e.deltaY*0.04;},{passive:false});
+window.addEventListener('resize',()=>{
+  const w=window.innerWidth-275;
+  renderer.setSize(w,window.innerHeight);
+  camera.aspect=w/window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+function updateCameraPosition(){
+  if(cameraXTarget===undefined)return;
+  cameraXTarget=Math.max(10,Math.min(totalWidth3D-10,cameraXTarget));
+  cameraXCurrent+=(cameraXTarget-cameraXCurrent)*0.1;
+  const ta=cameraAngles[viewMode];
+  cameraYCurrent+=(ta.y-cameraYCurrent)*0.08;
+  cameraZCurrent+=(ta.z-cameraZCurrent)*0.08;
+  lookZCurrent  +=(ta.lookZ-lookZCurrent)*0.08;
+  camera.position.set(cameraXCurrent,cameraYCurrent,cameraZCurrent);
+  camera.lookAt(cameraXCurrent,viewMode==='bancadas'?1.0:0,lookZCurrent);
+}
+
+// ─── RELOJ ─────────────────────────────────────────────────────────────────────
+function updateClock(){ document.getElementById('clock-sm').textContent=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); }
+updateClock(); setInterval(updateClock,10000);
+
+// ─── ANIMACIÓN ─────────────────────────────────────────────────────────────────
+const clock3 = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock3.getElapsedTime();
+  updateCameraPosition();
+  if(selectionGroup.visible){ arrowMesh.position.y=2.3+Math.sin(t*5)*0.15; ringMesh.rotation.z=t*1.5; }
+  if(repSelectionGroup.visible){ repArrowMesh.position.y=3.2+Math.sin(t*5+1.5)*0.15; repRingMesh.rotation.z=-t*1.8; }
+
+  // ─ Reps activos: empacando producto dentro de la caja amarilla ─
+  activeWorkers.forEach(w => {
+    const ph = w.userData.phase;
+    const reach = (Math.sin(t * 1.3 + ph) + 1) / 2;   // 0↔1 continuo y suave, sin saltos
+    if (w.userData.armPivot) w.userData.armPivot.rotation.x = -Math.PI/3 + reach * 0.5; // leve gesto de brazo
+    if (w.userData.product) {
+      w.userData.product.position.lerpVectors(w.userData.productStart, w.userData.productEnd, reach);
+    }
+    // Baile: balanceo lateral seguro (traslación + tilt en Z, no rotation.x/y que amplifica por el offset en Z)
+    const sway = Math.sin(t * 2.8 + ph);
+    w.position.x = w.userData.baseX + sway * 0.16;
+    w.rotation.z = sway * 0.12;
+    w.position.y = Math.abs(Math.sin(t * 5.6 + ph)) * 0.04;
+  });
+
+  // ─ Conveyor GM: cinta amarilla en movimiento ─
+  if (conveyorBelt) conveyorBelt.offset.x = (conveyorBelt.offset.x - 0.006 + 1) % 1;
+
+  // ─ De vez en cuando, largar un tote que viaja por el conveyor GM ─
+  if (conveyorInfo) {
+    if (t > nextToteSpawnT) {
+      const toteMesh = buildTote();
+      toteMesh.position.set(conveyorInfo.xMax, conveyorInfo.y, conveyorInfo.z);
+      scene.add(toteMesh);
+      conveyorTotes.push({ mesh: toteMesh, speed: 0.5 + Math.random()*0.25 });
+      nextToteSpawnT = t + 4 + Math.random()*4; // cada 4-8s aprox
+    }
+    for (let ci = conveyorTotes.length - 1; ci >= 0; ci--) {
+      const ct = conveyorTotes[ci];
+      ct.mesh.position.x -= ct.speed * (1/60);
+      if (ct.mesh.position.x < conveyorInfo.xMin) {
+        scene.remove(ct.mesh);
+        conveyorTotes.splice(ci, 1);
+      }
+    }
+  }
+
+  renderer.render(scene,camera);
+}
+animate();
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('loading-overlay').style.display='flex';
+  document.getElementById('ldot').classList.add('loading');
+
+  // 1. Query 1: pallets en stage — lee del Dataset que N8N sube (stage_data)
+  //    N8N hace: POST upload-url → PUT array JSON → POST publish
+  //    El HTML descarga el array y lo procesa en processStageData()
+  document.getElementById('load-txt').textContent = 'Cargando pallets en stage…';
+  const stageRaw = await loadDataset(DATASET_STAGE);
+  const isSynth  = !stageRaw || stageRaw.length === 0;
+
+  // 2. Query 2: reps + totes por bancada — lee del Dataset (reps_data)
+  //    N8N agrupa por bancada en el nodo "AGRUPAR REPS" antes de subir
+  //    Cada fila: { BANCADA, OPERARIO_LDAP, TOTES_TOTAL, TOTE_ACTIVO, TOTES_CODIGOS[] }
+  document.getElementById('load-txt').textContent = 'Cargando reps en bancada…';
+  const repsRaw = await loadDataset(DATASET_REPS);
+  repsMap = (repsRaw && repsRaw.length > 0) ? processRepsData(repsRaw) : new Map();
+  document.getElementById('load-txt').textContent = 'Calculando ociosidad de reps…';
+  const idleReps = await computeIdleStreaks(repsMap);
+
+  // 3. Procesar y renderizar
+  const byBancada = stageRaw ? processStageData(stageRaw) : new Map();
+  buildScene(byBancada, isSynth);
+  updateStageUI(allPallets, isSynth);
+  updateRepsUI(repsMap);
+  renderCenterKPIs(allPallets);
+  renderIdleBanner(idleReps);
+
+  document.getElementById('loading-overlay').style.display='none';
+  document.getElementById('ldot').classList.remove('loading');
+
+  // Auto-reload sincronizado con el schedule de N8N (10 min)
+  setTimeout(()=>location.reload(), 10*60*1000);
+}
+
+init();
+</script>
+
+
+
+</body></html>

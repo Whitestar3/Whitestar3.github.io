@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>SKYNET 360 · Warehouse Ops Center</title>
+  <style>
+    :root {
+      --stage:    #e84040;
+      --checkin:  #f0c040;
+      --mezanina: #b060f0;
+      --batch:    #40b0f0;
+      --packing:  #40d080;
+      --soon:     #44475a;
+      --bg:       #0d0f14;
+      --glass:    rgba(12,14,22,0.80);
+      --border:   rgba(255,255,255,0.09);
+      --text:     #e8eaf0;
+      --muted:    #6b7090;
+      --dock-w:   82px;
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html, body { width:100vw; height:100vh; overflow:hidden; background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; }
+
+    /* ── IFRAME full screen ── */
+    #mainFrame {
+      position:fixed; inset:0;
+      width:100%; height:100%;
+      border:none; z-index:0;
+      background:#111;
+      transition:opacity .3s;
+    }
+
+    /* ── LOADER ── */
+    .loader {
+      position:fixed; inset:0; z-index:10;
+      background:var(--bg);
+      display:flex; align-items:center; justify-content:center;
+      transition:opacity .4s;
+    }
+    .loader.hidden { opacity:0; pointer-events:none; }
+    .spinner {
+      width:30px; height:30px;
+      border:3px solid rgba(255,255,255,.07);
+      border-top-color:var(--stage);
+      border-radius:50%;
+      animation:spin .75s linear infinite;
+    }
+    @keyframes spin { to{ transform:rotate(360deg) } }
+
+    /* ── SOON SCREEN ── */
+    .soon-screen {
+      position:fixed; inset:0; z-index:10;
+      background:var(--bg);
+      display:none; align-items:center; justify-content:center;
+      flex-direction:column; gap:10px;
+    }
+    .soon-screen.visible { display:flex; }
+    .soon-screen .s-icon  { font-size:2.6rem; }
+    .soon-screen .s-title { font-size:.9rem; font-weight:700; color:var(--muted); }
+    .soon-screen .s-sub   { font-size:.7rem;  color:var(--muted); opacity:.5; }
+
+    /* ══════════════════════════════
+       LEFT DOCK
+    ══════════════════════════════ */
+    .dock {
+      position:fixed;
+      top:50%; left:12px;
+      transform:translateY(-50%);
+      z-index:40;
+      width:var(--dock-w);
+
+      display:flex; flex-direction:column; align-items:center; gap:0;
+
+      background:var(--glass);
+      backdrop-filter:blur(20px) saturate(180%);
+      -webkit-backdrop-filter:blur(20px) saturate(180%);
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:8px 6px 10px;
+      box-shadow:0 8px 32px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.04) inset;
+
+      /* hide animation */
+      opacity:1;
+      pointer-events:auto;
+      transition:opacity .25s, transform .25s;
+    }
+    .dock.hidden {
+      opacity:0;
+      pointer-events:none;
+      transform:translateY(-50%) translateX(-20px);
+    }
+
+    /* Close button inside dock */
+    .dock-close {
+      width:24px; height:20px;
+      background:rgba(255,255,255,.05);
+      border:1px solid var(--border);
+      border-radius:6px;
+      cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.6rem; color:var(--muted);
+      flex-shrink:0;
+      margin-bottom:8px;
+      transition:background .15s, color .15s;
+    }
+    .dock-close:hover { background:rgba(255,255,255,.13); color:var(--text); }
+
+    /* Separator */
+    .dock-sep { width:32px; height:1px; background:var(--border); margin:5px auto; }
+
+    /* Zone button */
+    .dock-btn {
+      position:relative;
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      width:100%; padding:5px 0;
+      border:none; background:transparent;
+      cursor:pointer;
+      transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    .dock-btn:hover:not(.soon-btn) { transform:translateX(4px) scale(1.1); }
+    .dock-btn.active               { transform:translateX(3px); }
+    .dock-btn.soon-btn             { opacity:.38; cursor:not-allowed; }
+
+    /* 3D Cube */
+    .cube-wrap { width:46px; height:46px; perspective:140px; flex-shrink:0; }
+    .cube {
+      width:46px; height:46px;
+      border-radius:12px;
+      background:var(--z-color);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.4rem;
+      box-shadow:
+        4px 0 0 color-mix(in srgb,var(--z-color) 45%,#000 55%),
+        6px 0 0 color-mix(in srgb,var(--z-color) 25%,#000 75%),
+        0 2px 12px color-mix(in srgb,var(--z-color) 35%,transparent 65%);
+      transform:rotateY(-10deg);
+      transition:transform .2s, box-shadow .2s;
+      position:relative;
+    }
+    .cube::before {
+      content:'';
+      position:absolute; top:0; left:0; right:0; height:40%;
+      border-radius:12px 12px 0 0;
+      background:linear-gradient(to bottom,rgba(255,255,255,.18),transparent);
+      pointer-events:none;
+    }
+    .dock-btn:hover:not(.soon-btn) .cube {
+      transform:rotateY(-18deg) rotateX(6deg);
+      box-shadow:
+        8px 0 0 color-mix(in srgb,var(--z-color) 45%,#000 55%),
+        12px 0 0 color-mix(in srgb,var(--z-color) 22%,#000 78%),
+        0 4px 22px color-mix(in srgb,var(--z-color) 50%,transparent 50%);
+    }
+    .dock-btn.active .cube {
+      transform:rotateY(-14deg);
+      box-shadow:
+        6px 0 0 color-mix(in srgb,var(--z-color) 45%,#000 55%),
+        9px 0 0 color-mix(in srgb,var(--z-color) 25%,#000 75%),
+        0 3px 18px color-mix(in srgb,var(--z-color) 55%,transparent 45%);
+    }
+
+    /* Active left accent bar */
+    .dock-btn.active::before {
+      content:'';
+      position:absolute; left:-6px; top:50%; transform:translateY(-50%);
+      width:3px; height:22px; border-radius:0 3px 3px 0;
+      background:var(--z-color);
+      box-shadow:0 0 8px var(--z-color);
+    }
+
+    /* Active dot */
+    .dock-dot {
+      width:5px; height:5px; border-radius:50%;
+      background:var(--z-color); opacity:0;
+      transition:opacity .2s;
+      box-shadow:0 0 5px var(--z-color);
+    }
+    .dock-btn.active .dock-dot { opacity:1; }
+
+    /* Label */
+    .dock-lbl {
+      font-size:.58rem; font-weight:700; color:var(--muted);
+      letter-spacing:.5px; text-transform:uppercase; white-space:nowrap;
+    }
+
+    /* Tooltip (always available) */
+    .dock-tip {
+      position:absolute;
+      left:calc(100% + 10px); top:50%; transform:translateY(-50%);
+      background:rgba(12,14,22,.96);
+      border:1px solid var(--border);
+      border-radius:8px; padding:4px 10px;
+      font-size:.68rem; font-weight:600; color:var(--text);
+      white-space:nowrap; pointer-events:none;
+      opacity:0; transition:opacity .15s;
+    }
+    .dock-tip::before {
+      content:'';
+      position:absolute; right:100%; top:50%; transform:translateY(-50%);
+      border:5px solid transparent; border-right-color:var(--border);
+    }
+    .dock-btn:hover .dock-tip { opacity:1; }
+
+    /* Zone colors */
+    [data-zone="stage"]    { --z-color:var(--stage); }
+    [data-zone="checkin"]  { --z-color:var(--checkin); }
+    [data-zone="mezanina"] { --z-color:var(--mezanina); }
+    [data-zone="batch"]    { --z-color:var(--batch); }
+    [data-zone="packing"]  { --z-color:var(--packing); }
+    [data-zone="hs"]       { --z-color:var(--soon); }
+    [data-zone="rk"]       { --z-color:var(--soon); }
+
+    /* ── SHOW BUTTON — appears when dock is hidden ── */
+    #showBtn {
+      position:fixed;
+      top:50%; left:0;
+      transform:translateY(-50%);
+      z-index:50;
+      width:14px; height:48px;
+      background:rgba(255,255,255,.07);
+      border:1px solid var(--border);
+      border-left:none;
+      border-radius:0 10px 10px 0;
+      cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.55rem; color:var(--muted);
+      opacity:0; pointer-events:none;
+      transition:opacity .25s, background .15s;
+    }
+    #showBtn.visible { opacity:1; pointer-events:auto; }
+    #showBtn:hover   { background:rgba(255,255,255,.16); color:var(--text); }
+  </style>
+</head>
+<body>
+
+<iframe id="mainFrame"
+        title="Warehouse Zone"></iframe>
+
+<div class="loader" id="loader">
+  <div class="spinner" id="spinner"></div>
+</div>
+
+<div class="soon-screen" id="soonScreen">
+  <div class="s-icon">🔒</div>
+  <div class="s-title">Próximamente</div>
+  <div class="s-sub">Este tablero estará disponible pronto</div>
+</div>
+
+<!-- Thin edge trigger to show dock -->
+<button id="showBtn" title="Mostrar menú">▶</button>
+
+<!-- ═══ LEFT DOCK ═══ -->
+<div class="dock" id="dock">
+
+  <button class="dock-close" id="closeBtn" title="Ocultar menú">✕</button>
+
+  <button class="dock-btn active" data-zone="stage"
+          data-name="Stage">
+    <div class="cube-wrap"><div class="cube">🚚</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">Stage</div>
+    <div class="dock-tip">Stage</div>
+  </button>
+
+  <button class="dock-btn" data-zone="checkin"
+          data-name="Check-In">
+    <div class="cube-wrap"><div class="cube">✅</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">Check-In</div>
+    <div class="dock-tip">Check-In</div>
+  </button>
+
+  <button class="dock-btn" data-zone="mezanina"
+          data-name="Mezanina">
+    <div class="cube-wrap"><div class="cube">🏢</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">Mezanina</div>
+    <div class="dock-tip">Mezanina</div>
+  </button>
+
+  <button class="dock-btn" data-zone="batch"
+          data-name="Batch Sorter">
+    <div class="cube-wrap"><div class="cube">🔀</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">Sorter</div>
+    <div class="dock-tip">Batch Sorter</div>
+  </button>
+
+  <button class="dock-btn" data-zone="packing"
+          data-name="Packing">
+    <div class="cube-wrap"><div class="cube">📦</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">Packing</div>
+    <div class="dock-tip">Packing</div>
+  </button>
+
+  <div class="dock-sep"></div>
+
+  <button class="dock-btn soon-btn" data-zone="hs" data-name="HS — Hand Stack">
+    <div class="cube-wrap"><div class="cube">🔒</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">HS</div>
+    <div class="dock-tip">HS — Pronto</div>
+  </button>
+
+  <button class="dock-btn soon-btn" data-zone="rk" data-name="RK — Racks">
+    <div class="cube-wrap"><div class="cube">🔒</div></div>
+    <div class="dock-dot"></div>
+    <div class="dock-lbl">RK</div>
+    <div class="dock-tip">RK — Pronto</div>
+  </button>
+
+</div>
+
+<script>
+  const frame    = document.getElementById('mainFrame');
+  const loader   = document.getElementById('loader');
+  const spinner  = document.getElementById('spinner');
+  const soon     = document.getElementById('soonScreen');
+  const dock     = document.getElementById('dock');
+  const closeBtn = document.getElementById('closeBtn');
+  const showBtn  = document.getElementById('showBtn');
+
+  // Zona -> página 3D (archivos de esta misma carpeta). Batch Sorter aún no tiene vista.
+  let zoneLinks = {
+    stage:    'stage-3d.html',
+    checkin:  'checkin-completo.html',
+    mezanina: 'mezanina.html',
+    packing:  'packing-3d.html'
+  };
+
+  // Hide/show dock
+  closeBtn.addEventListener('click', () => {
+    dock.classList.add('hidden');
+    showBtn.classList.add('visible');
+  });
+  showBtn.addEventListener('click', () => {
+    dock.classList.remove('hidden');
+    showBtn.classList.remove('visible');
+  });
+
+  function navigate(btn) {
+    const zone = btn.dataset.zone;
+    const url  = zoneLinks[zone];
+
+    document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    spinner.style.borderTopColor = `var(--${zone})`;
+
+    if (!url) {
+      soon.classList.add('visible');
+      loader.classList.add('hidden');
+      frame.style.opacity = '0';
+      return;
+    }
+
+    soon.classList.remove('visible');
+    frame.style.opacity = '1';
+    loader.classList.remove('hidden');
+    frame.src = url;
+  }
+
+  frame.addEventListener('load', () => loader.classList.add('hidden'));
+
+  document.querySelectorAll('.dock-btn:not(.soon-btn)').forEach(btn =>
+    btn.addEventListener('click', () => navigate(btn))
+  );
+
+  const activeBtn = document.querySelector('.dock-btn.active');
+  if (activeBtn) navigate(activeBtn);
+</script>
+
+
+
+
+
+</body>
+</html>

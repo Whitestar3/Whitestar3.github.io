@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="color-scheme" content="dark"/>
+<title>Stage 3D — CD-01</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080e;--surface:#0d0f1b;--card:#121526;--border:#1e243d;
+  --green:#27ae60;--yellow:#f1c40f;--red:#e74c3c;--burnt:#ff2a2a;--cyan:#00f3ff;
+  --txt:#dde2ee;--sub:#5d6d8a;--accent:#f39c12;
+}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+.topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:30;flex-wrap:wrap}
+.back{color:var(--accent);font-size:.8rem;font-weight:700;text-decoration:none;opacity:.8;transition:opacity .15s}.back:hover{opacity:1}
+.sep{width:1px;height:16px;background:var(--border)}
+.zone-title{font-size:.9rem;font-weight:800;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.zone-sub{font-size:.65rem;color:var(--sub)}
+.topbar-kpis{display:flex;gap:14px;margin-left:auto;align-items:center;flex-wrap:wrap}
+.tk{display:flex;align-items:center;gap:4px;font-size:.72rem;background:rgba(255,255,255,.03);border:1px solid var(--border);padding:3px 7px;border-radius:8px}
+.tk-dot{width:8px;height:8px;border-radius:2px}
+.tk-v{font-weight:700}
+.tk-lbl{font-size:.56rem;color:var(--sub);text-transform:uppercase}
+.occ-chip{font-size:.68rem;color:var(--sub);background:rgba(255,255,255,.03);border:1px solid var(--border);padding:3px 8px;border-radius:10px}
+.occ-chip b{color:var(--txt)}
+.day-badge{font-size:.62rem;font-weight:700;padding:3px 8px;border-radius:10px;border:1px solid rgba(243,156,18,.4);background:rgba(243,156,18,.12);color:var(--accent);display:none;align-items:center;gap:4px}
+.day-badge.show{display:inline-flex}
+.freshness{font-size:.62rem;color:var(--sub);display:flex;align-items:center;gap:5px}
+.freshness.stale{color:var(--yellow)}
+.freshness.dead{color:var(--red)}
+.icon-btn{background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--sub);width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.icon-btn:hover{border-color:var(--cyan);color:var(--txt)}
+.icon-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(243,156,18,.12)}
+.live{display:flex;align-items:center;gap:6px;font-size:.65rem;color:var(--sub);background:rgba(255,255,255,0.03);padding:3px 8px;border-radius:10px;border:1px solid var(--border)}
+.ldot{width:6px;height:6px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+.ldot.loading{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.ldot.error{background:var(--red);box-shadow:0 0 8px var(--red);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.banner{flex-shrink:0;display:none;align-items:center;gap:10px;padding:6px 16px;font-size:.72rem;font-weight:700;z-index:29}
+.banner.show{display:flex}
+.banner.demo{background:rgba(243,156,18,.15);color:var(--accent);border-bottom:1px solid rgba(243,156,18,.4)}
+.banner.conn{background:rgba(231,76,60,.15);color:var(--red);border-bottom:1px solid rgba(231,76,60,.4)}
+.main-wrapper{flex:1;display:flex;min-height:0;position:relative;overflow:hidden}
+#three-canvas{width:100%;height:100%;display:block;cursor:grab}
+#three-canvas:active{cursor:grabbing}
+.nav-hint{position:absolute;bottom:15px;left:20px;background:rgba(13,15,27,0.85);border:1px solid var(--border);padding:6px 12px;border-radius:20px;font-size:.65rem;color:var(--sub);pointer-events:none;z-index:10;backdrop-filter:blur(4px)}
+#loading-overlay{position:absolute;inset:0;background:rgba(7,8,14,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;gap:14px}
+#loading-overlay .spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite}
+#loading-overlay .load-txt{font-size:.75rem;color:var(--sub)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sidebar-toggle{display:none;position:absolute;top:10px;right:10px;z-index:25}
+/* Panel Lateral */
+.urgent{width:290px;flex-shrink:0;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;z-index:20;box-shadow:-5px 0 20px rgba(0,0,0,0.5);transition:transform .2s ease}
+.urg-head{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.urg-title{font-size:.75rem;font-weight:800;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.urg-ts{font-size:.58rem;color:var(--sub)}
+.urg-counters{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:8px 12px 4px;flex-shrink:0}
+.urg-ct{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 8px;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:all .15s}
+.urg-ct:hover{border-color:var(--cyan)}
+.urg-ct.active{outline:2px solid var(--cyan);outline-offset:-1px}
+.urg-ct-v{font-size:1.1rem;font-weight:800;line-height:1}
+.urg-ct-l{font-size:.5rem;color:var(--sub);text-transform:uppercase;margin-top:2px}
+.urg-ct.burnt .urg-ct-v{color:var(--burnt)}
+.urg-ct.red .urg-ct-v{color:var(--red)}
+.urg-ct.yellow .urg-ct-v{color:var(--yellow)}
+.urg-ct.green .urg-ct-v{color:var(--green)}
+.urg-ct-v.flash{animation:flashbg 1.4s ease 2}
+@keyframes flashbg{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+.zone-rollup{padding:6px 12px;display:flex;flex-wrap:wrap;gap:5px;border-bottom:1px solid var(--border);flex-shrink:0}
+.zr-chip{font-size:.58rem;font-weight:700;padding:3px 7px;border-radius:10px;cursor:pointer;border:1px solid var(--border);color:var(--txt);background:var(--card)}
+.zr-chip:hover{border-color:var(--cyan)}
+.filter-bar{padding:6px 12px;display:flex;gap:5px;border-bottom:1px solid var(--border);flex-shrink:0}
+.filter-bar input,.filter-bar select{flex:1;background:var(--card);border:1px solid var(--border);color:var(--txt);font-size:.65rem;padding:5px 6px;border-radius:5px;min-width:0}
+.filter-bar button{background:var(--card);border:1px solid var(--border);color:var(--sub);font-size:.65rem;padding:5px 7px;border-radius:5px;cursor:pointer}
+.filter-bar button:hover{color:var(--txt);border-color:var(--cyan)}
+.urg-count-line{padding:4px 12px;font-size:.58rem;color:var(--sub);flex-shrink:0}
+.urg-list{flex:1;overflow-y:auto;padding:6px 8px}
+.urg-item{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:6px 8px;margin-bottom:4px;cursor:pointer;transition:all .15s}
+.urg-item:hover{border-color:var(--cyan);transform:translateX(-2px);background:#161b30}
+.urg-item.burnt{border-left:4px solid var(--burnt)}
+.urg-item.red{border-left:4px solid var(--red)}
+.urg-item.yellow{border-left:4px solid var(--yellow)}
+.urg-item.green{border-left:4px solid var(--green)}
+.urg-item.is-new{animation:newpulse 2.5s ease 3}
+@keyframes newpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 2px var(--cyan)}}
+.ui-row1{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.ui-hrs{font-size:.6rem;font-weight:800;padding:2px 5px;border-radius:3px;min-width:32px;text-align:center}
+.ui-hrs.burnt{background:rgba(255,42,42,0.25);color:#ff6b6b}
+.ui-hrs.red{background:rgba(231,76,60,0.2);color:var(--red)}
+.ui-hrs.yellow{background:rgba(241,196,15,0.2);color:var(--yellow)}
+.ui-hrs.green{background:rgba(39,174,96,0.2);color:var(--green)}
+.ui-id{font-size:.65rem;font-weight:700;color:var(--txt)}
+.ui-range{font-size:.58rem;color:var(--sub);margin-left:auto;font-family:monospace}
+.ui-row2{display:flex;gap:6px;align-items:center}
+.ui-klass{font-size:.52rem;padding:1px 5px;border-radius:3px;font-weight:700}
+.ui-seller{font-size:.55rem;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty-hint{padding:20px 10px;text-align:center;font-size:.65rem;color:var(--sub)}
+/* Popover */
+.popover{position:fixed;width:310px;max-width:calc(100vw - 20px);background:rgba(15,18,32,0.95);backdrop-filter:blur(16px);border:1px solid var(--cyan);border-radius:8px;box-shadow:0 0 25px rgba(0,243,255,0.25);z-index:100;padding:14px;font-size:.7rem;display:none}
+.pop-close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--sub);font-size:1rem;line-height:1}.pop-close:hover{color:#fff}
+.pop-title{font-weight:800;font-size:.82rem;color:var(--txt);margin-bottom:10px;padding-right:20px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pop-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a2138}
+.pop-lbl{color:var(--sub)}
+.pop-val{font-weight:600;color:var(--txt);text-align:right;max-width:65%}
+.pop-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:800;font-size:.6rem;text-transform:uppercase;white-space:nowrap}
+.pop-badge.burnt{background:rgba(255,42,42,0.3);color:#ff8080;border:1px solid var(--burnt)}
+.pop-badge.red{background:rgba(231,76,60,0.3);color:var(--red)}
+.pop-badge.yellow{background:rgba(241,196,15,0.25);color:var(--yellow)}
+.pop-badge.green{background:rgba(39,174,96,0.25);color:var(--green)}
+#hover-tooltip{position:fixed;pointer-events:none;background:rgba(5,7,12,0.95);border:1px solid var(--cyan);padding:4px 8px;border-radius:4px;font-size:.65rem;color:#fff;font-weight:700;display:none;z-index:90;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+/* Modales: ayuda / visitas / nombre */
+.modal-backdrop{position:fixed;inset:0;background:rgba(5,6,10,0.72);backdrop-filter:blur(3px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.show{display:flex}
+.modal-box{width:min(560px,92vw);max-height:80vh;overflow-y:auto;background:var(--surface);border:1px solid var(--cyan);border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.modal-box.narrow{width:min(360px,92vw)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);font-weight:800;font-size:.85rem;color:var(--accent);position:sticky;top:0;background:var(--surface)}
+.modal-body{padding:14px 16px;font-size:.75rem;line-height:1.6;color:var(--txt)}
+.modal-body p{margin-bottom:10px}
+.modal-body b{color:var(--accent)}
+.name-save-btn,.name-save-btn:hover{margin-top:10px;width:100%;background:var(--accent);color:#1a1200;font-weight:800;border:none;padding:8px;border-radius:6px;cursor:pointer;font-size:.75rem}
+#name-input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--txt);padding:8px;border-radius:6px;font-size:.8rem}
+.viewers-summary{font-size:.7rem;color:var(--sub);margin-bottom:10px}
+.viewers-summary b{color:var(--txt)}
+.viewers-list{display:flex;flex-direction:column;gap:6px}
+.visits-table-wrap{max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.visits-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.visits-table thead th{position:sticky;top:0;background:var(--card);text-align:left;text-transform:uppercase;color:var(--sub);font-size:.62rem;padding:6px 8px;border-bottom:1px solid var(--border)}
+.visits-table tbody td{padding:6px 8px;border-bottom:1px solid var(--border)}
+.visits-table tbody tr:last-child td{border-bottom:none}
+.visits-dot{width:7px;height:7px;border-radius:50%;display:inline-block;background:var(--green)}
+.visits-dot.stale{background:var(--sub)}
+.viewer-row{display:flex;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.7rem}
+.viewer-row .vr-time{color:var(--sub);font-family:monospace;font-size:.62rem}
+/* Modo TV — pantallas de piso vistas a distancia */
+body.tv-mode .zone-title{font-size:1.2rem}
+body.tv-mode .tk-v{font-size:1.05rem}
+body.tv-mode .urg-title{font-size:1rem}
+body.tv-mode .urg-ct-v{font-size:1.55rem}
+body.tv-mode .urg-ct-l{font-size:.68rem}
+body.tv-mode .ui-hrs{font-size:.78rem;padding:3px 7px}
+body.tv-mode .ui-id{font-size:.85rem}
+body.tv-mode .ui-seller{font-size:.7rem}
+body.tv-mode .urgent{width:340px}
+/* Responsive: pantallas angostas (notebooks/tablets de piso) */
+@media (max-width:900px){
+  .sidebar-toggle{display:flex}
+  .urgent{position:absolute;right:0;top:0;bottom:0;transform:translateX(100%)}
+  .urgent.open{transform:translateX(0)}
+}
+</style>
+<script>
+/* Sin backend: estado en memoria para que las vistas funcionen en modo demo */
+(function(){var mem={};function g(n){return Promise.resolve({state:mem[n]||null});}
+function s(n,d){mem[n]=d;return Promise.resolve({state:d});}
+window.GRID={states:{get:g,set:s,patch:s},state:{get:function(){return g('_');},set:function(d){return s('_',d);},patch:function(d){return s('_',d);}}};})();
+</script>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="back" href="#">← CD-01</a>
+  <div class="sep"></div>
+  <div>
+    <div class="zone-title">Stage IS — CD-01</div>
+    <div class="zone-sub">Inbound · Andenes IS por dock</div>
+  </div>
+  <div class="topbar-kpis" id="topbar-kpis"></div>
+  <div class="day-badge" id="day-badge">⏸ SLA en pausa hoy</div>
+  <div class="freshness" id="freshness">· --</div>
+  <button class="icon-btn" id="btn-tv" title="Modo TV (pantalla de piso)">TV</button>
+  <button class="icon-btn" id="btn-sound" title="Alertas sonoras de pallets quemados">🔔</button>
+  <button class="icon-btn" id="btn-fire" title="Animación de fuego en pallets quemados (≥24h)">🔥</button>
+  <button class="icon-btn" id="btn-visits" title="Libro de visitas" style="display:none">👁</button>
+  <button class="icon-btn" id="btn-help" title="Cómo funciona este tablero">❓</button>
+  <div class="live"><div class="ldot" id="ldot"></div><span id="clock-sm">--:--</span></div>
+</div>
+
+<div class="banner demo" id="banner-demo">⚠ DATOS DE DEMOSTRACIÓN — sin datos reales desde Grid. No usar para decisiones operativas.</div>
+<div class="banner conn" id="banner-conn">⚠ Sin conexión con Grid — mostrando el último dato válido recibido.</div>
+
+<div class="modal-backdrop" id="help-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>❓ Cómo funciona este tablero</span>
+      <span class="pop-close" id="help-close">✕</span>
+    </div>
+    <div class="modal-body">
+      <p><b>¿Qué es esto?</b> Es una vista 3D del Stage de Inbound de CD-01. Cada caja de color es <b>un pallet real</b>, parado en su posición física dentro de un andén o un buffer, con la misma info que ves en el WMS.</p>
+      <p><b>¿Qué significan los colores?</b> Es un semáforo según cuántas horas lleva el pallet parado en Stage:</p>
+      <p>✅ Verde: menos de 16 horas — normal.<br>
+      ⚠️ Amarillo: entre 16 y 20 horas — para tener en el radar.<br>
+      ⛔ Rojo: entre 20 y 24 horas — urgente, priorizar.<br>
+      🔥 Quemado: 24 horas o más — crítico, tiene animación de fuego para que salte a la vista.</p>
+      <p><b>¿Por qué a veces el conteo no sube?</b> Los domingos y feriados el reloj de horas se pausa (no cuentan como tiempo parado) — vas a ver un cartel "⏸ SLA en pausa" arriba esos días.</p>
+      <p><b>Andén vs. Buffer:</b> los andenes son las filas numeradas por dock (ej. "13-16"), donde el pallet espera para ser procesado. Los buffers son zonas de espera intermedia antes de eso.</p>
+      <p><b>Panel de la derecha:</b> lista los pallets ordenados por urgencia (el que lleva más horas, primero). Podés tocar cualquier número de arriba (🔥/⛔/⚠️/✅) para filtrar solo esos, buscar por pallet/seller/dock en el buscador, o tocar una zona crítica sugerida para saltar directo ahí.</p>
+      <p><b>Botones de arriba:</b> <b>TV</b> agranda todo para ver desde lejos en una pantalla de piso. <b>🔔</b> prende un sonido cuando aparece un nuevo pallet quemado. <b>🔥</b> prende/apaga la animación de fuego.</p>
+      <p><b>"Dato de hace X min":</b> es cuán vieja es la información que estás viendo (se actualiza sola cada pocos minutos). Si dice "sin dato real" o aparece el cartel naranja de demostración, significa que no hay conexión con los datos reales en ese momento — no tomar decisiones con esos números.</p>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="visits-backdrop">
+  <div class="modal-box narrow">
+    <div class="modal-head">
+      <span>👁 Libro de visitas</span>
+      <span class="pop-close" id="visits-close">✕</span>
+    </div>
+    <div class="modal-body">
+      <div id="visits-summary" class="viewers-summary">Cargando…</div>
+      <div class="visits-table-wrap">
+        <table class="visits-table">
+          <thead><tr><th></th><th>Usuario</th><th>Entró</th><th>Duración</th><th>Última actividad</th></tr></thead>
+          <tbody id="visits-tbody"></tbody>
+        </table>
+      </div>
+      <button id="visits-csv" class="name-save-btn" style="margin-top:12px">⬇ Exportar CSV</button>
+    </div>
+  </div>
+</div>
+
+<div class="main-wrapper">
+  <canvas id="three-canvas"></canvas>
+  <div id="loading-overlay">
+    <div class="spin"></div>
+    <div class="load-txt">Cargando datos…</div>
+  </div>
+  <div class="nav-hint">↔ Arrastra con el mouse o usa la rueda para desplazarte</div>
+  <button class="icon-btn sidebar-toggle" id="btn-sidebar">☰</button>
+  <div class="urgent" id="urgent-panel">
+    <div class="urg-head">
+      <div class="urg-title">⚡ Urgentes Stage</div>
+      <div class="urg-ts" id="urg-ts"></div>
+    </div>
+    <div class="urg-counters" id="urg-counters"></div>
+    <div class="zone-rollup" id="zone-rollup"></div>
+    <div class="filter-bar">
+      <input type="text" id="f-search" placeholder="Buscar pallet, seller, dock…"/>
+      <select id="f-klass"><option value="">Todas las zonas</option></select>
+      <button id="f-clear" title="Limpiar filtros">✕</button>
+    </div>
+    <div class="urg-count-line" id="urg-count-line"></div>
+    <div class="urg-list" id="urg-list"></div>
+  </div>
+</div>
+
+<div id="hover-tooltip"></div>
+<div class="popover" id="popover">
+  <span class="pop-close" onclick="closePopover()">✕</span>
+  <div class="pop-title" id="pop-title"></div>
+  <div id="pop-body"></div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+// PASO OBLIGATORIO: generá un token NUEVO en Grid (el viejo quedó expuesto y
+// debe darse de baja) y pegalo acá abajo, reemplazando el texto de ejemplo.
+// Sí, este token queda visible para quien abra el código de esta página —
+// es la misma forma en que funcionaba el archivo original. Es una limitación
+// real de esta página (no tiene backend propio), no algo que se pueda
+// esconder del todo con trucos de JavaScript.
+const GRID_TOKEN = 'PEGA_ACA_TU_TOKEN_NUEVO_DE_GRID';
+const STAGE_DATASET_NAME = 'stage_data';
+const REFRESH_INTERVAL_MS = 3 * 60 * 1000; // el flujo N8N corre cada 10 min
+
+// ─── CONSTANTES DE DISEÑO 3D ────────────────────────────────────────────────
+const CELL_3D_SIZE = 1.3;
+const GAP_3D       = 0.5;
+const MAX_ROWS     = 10;
+
+// ─── SLA THRESHOLDS — Stage IS ──────────────────────────────────────────────
+const SEMAFORO_MAP = { QUEMADO:'burnt', ROJO:'red', AMARILLO:'yellow', VERDE:'green' };
+
+function ageBucket(h) {
+  if (h < 16) return 'green';
+  if (h < 20) return 'yellow';
+  if (h < 24) return 'red';
+  return 'burnt';
+}
+const BUCKET_ORDER = ['burnt','red','yellow','green'];
+const BUCKET_HEX   = { green:0x27ae60, yellow:0xf1c40f, red:0xe74c3c, burnt:0xff2a2a };
+const BKT_LABEL    = { green:'Fresco <16h', yellow:'Atención 16-20h', red:'Urgente 20-24h', burnt:'Quemado ≥24h' };
+const BKT_ICON     = { green:'✅', yellow:'⚠️', red:'⛔', burnt:'🔥' };
+
+// ─── COLORES DE ZONA ─────────────────────────────────────────────────────────
+const KLASS_COLOR = {
+  HS:'#3498db', CPG:'#9b59b6', GM:'#10b981', RK:'#f59e0b',
+  HV:'#1abc9c', CARGA:'#7f8c8d', SUSPEL:'#c0392b', ESFERA:'#e91e63',
+  DCI:'#f39c12', BL:'#2ecc71', OTROS:'#7f8c8d', INP:'#475569',
+  TOTES:'#64748b', STAGE:'#0ea5e9', CALID:'#a855f7'
+};
+
+// ─── CALENDARIO NO HÁBIL (informativo, cliente) ─────────────────────────────
+// El backend (BigQuery, ver STAGE QUERY1 en N8N) hoy sólo excluye DOMINGOS del
+// conteo de HORAS_SLA. Esta lista es para que el badge del dashboard sea
+// honesto respecto de esa misma regla; agregar acá los feriados de Chile NO
+// cambia las horas ya calculadas por el backend. Ver recomendación de ajuste
+// de la query en la documentación entregada aparte.
+const FERIADOS_CL = [
+  '2026-01-01','2026-04-03','2026-04-04','2026-05-01','2026-05-21',
+  '2026-06-29','2026-07-16','2026-08-15','2026-09-18','2026-09-19',
+  '2026-10-12','2026-10-31','2026-11-01','2026-12-08','2026-12-25'
+];
+function isNonWorkingToday() {
+  const now = new Date();
+  const isSunday = now.getDay() === 0;
+  const iso = now.toISOString().slice(0,10);
+  const isHoliday = FERIADOS_CL.indexOf(iso) !== -1;
+  return { pause: isSunday || isHoliday, isSunday, isHoliday };
+}
+
+// ─── UTILIDAD: escape de texto para innerHTML (XSS) ─────────────────────────
+// Todo dato que viene de BigQuery/N8N (seller, pallet id, posición) se trata
+// como no confiable antes de insertarlo en el DOM.
+function escapeHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, function (ch) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+  });
+}
+
+// ─── LAYOUT DE STAGE ─────────────────────────────────────────────────────────
+function getGrid(cap){ return { rows:MAX_ROWS, cols:Math.max(1,Math.ceil(cap/MAX_ROWS)) }; }
+
+const STAGE_LAYOUT = [
+  {kind:'zone-gray', label:'PAÑOL / INSUMOS', dockRange:'1-4',  cols:3},
+  {kind:'zone-gray', label:'BAÑO',             dockRange:'5-6',  cols:2},
+  {kind:'buffer',    label:'BUFFER PA HS',     dockRange:'7-11', klass:'HS',  capacity:100, bufferDocks:[7,8,9,10,11], ...getGrid(100)},
+  {kind:'se', cols:1},
+  {kind:'anden', dockRange:'12',    dockStart:12, dockEnd:12, klass:'CARGA',  capacity:20,  ...getGrid(20)},
+  {kind:'anden', dockRange:'13-16', dockStart:13, dockEnd:16, klass:'HS',    capacity:80,  ...getGrid(80)},
+  {kind:'anden', dockRange:'17-20', dockStart:17, dockEnd:20, klass:'HS',    capacity:90,  ...getGrid(90)},
+  {kind:'anden', dockRange:'21-22', dockStart:21, dockEnd:22, klass:'OTROS', capacity:50,  ...getGrid(50)},
+  {kind:'zone-gray', label:'RETIRO HH / RADIOS', dockRange:'23-25', cols:3},
+  {kind:'anden', dockRange:'26',    dockStart:26, dockEnd:26, klass:'SUSPEL', capacity:20, ...getGrid(20)},
+  {kind:'se', cols:1},
+  {kind:'zone-gray', label:'BANCADAS DCI', dockRange:'27-31', cols:4},
+  {kind:'buffer',    label:'BUFFER DCI',   dockRange:'32-34', klass:'DCI', capacity:40, bufferDocks:[32,33,34], cols:3},
+  {kind:'anden', dockRange:'35-40', dockStart:35, dockEnd:40, klass:'CPG',    capacity:100, ...getGrid(100)},
+  {kind:'anden', dockRange:'41-42', dockStart:41, dockEnd:42, klass:'ESFERA', capacity:50,  ...getGrid(50)},
+  {kind:'se', cols:1},
+  {kind:'buffer',    label:'BUFFER BL',    dockRange:'43-44', klass:'BL', capacity:30, bufferDocks:[43,44], cols:2},
+  {kind:'zone-gray', label:'INP (NO OPERADO)', dockRange:'45-46', cols:2},
+  {kind:'anden', dockRange:'48',    dockStart:48, dockEnd:48, klass:'GM', capacity:30,  ...getGrid(30)},
+  {kind:'anden', dockRange:'49-52', dockStart:49, dockEnd:52, klass:'GM', capacity:80,  ...getGrid(80)},
+  {kind:'anden', dockRange:'53-55', dockStart:53, dockEnd:55, klass:'GM', capacity:70,  ...getGrid(70)},
+  {kind:'anden', dockRange:'56-57', dockStart:56, dockEnd:57, klass:'HV', capacity:40,  ...getGrid(40)},
+  {kind:'se', cols:1},
+  {kind:'anden', dockRange:'58-62', dockStart:58, dockEnd:62, klass:'GM', capacity:100, ...getGrid(100)},
+  {kind:'zone-gray', label:'CALIDAD', dockRange:'63-65', cols:3},
+  {kind:'anden', dockRange:'66-68', dockStart:66, dockEnd:68, klass:'RK', capacity:60, ...getGrid(60)},
+  {kind:'anden', dockRange:'69-72', dockStart:69, dockEnd:72, klass:'RK', capacity:80, ...getGrid(80)},
+];
+
+// Capacidad máxima total del Stage — suma de todos los "capacity" del layout
+// (andenes + buffers). Se calcula del layout, no se hardcodea, para que si
+// mañana cambia un dock/buffer esto se actualice solo.
+const TOTAL_CAPACITY = STAGE_LAYOUT.reduce((sum, item) => sum + (item.capacity || 0), 0);
+
+// ─── PARSEO DE POSICION ──────────────────────────────────────────────────────
+function parseStagePos(posicion) {
+  if (!posicion) return null;
+  const p = String(posicion).split('-');
+  if (p.length >= 4 && p[0] === 'SI') {
+    const dock = parseInt(p[2]);
+    const pos  = parseInt(p[3]);
+    if (!isNaN(dock) && !isNaN(pos)) return { dock, pos };
+  }
+  return null;
+}
+
+function snakePositions(rows, cols, count) {
+  const pos = []; let goingUp = true;
+  for (let c = cols-1; c >= 0 && pos.length < count; c--) {
+    if (goingUp) { for (let r = rows-1; r >= 0 && pos.length < count; r--) pos.push({row:r,col:c}); }
+    else         { for (let r = 0; r < rows && pos.length < count; r++)     pos.push({row:r,col:c}); }
+    goingUp = !goingUp;
+  }
+  return pos;
+}
+
+// ─── CARGA DE DATOS DESDE GRID (dataset, mismo que llena N8N) ───────────────
+// Este es el mismo dataset que tu flujo N8N ya publica (upload-url → PUT →
+// publish, sin cambios). La única diferencia contra el archivo original es
+// que estas llamadas NO mandan un token en el header — se hacen sin
+// Authorization, apoyándose en que estás viendo el documento adentro de Grid
+// (misma sesión, mismo origen). Si Grid exige el token también para leer,
+// esto va a fallar con 401/403 en la consola del navegador — en ese caso
+// avisame con ese error exacto y vemos la alternativa.
+async function loadDataset(name) {
+  const docId = (window.GRID && window.GRID.docId) || '';
+  const metaResp = await fetch(`/api/v1/documents/${docId}/datasets/${name}`, {
+    headers: { 'Authorization': `Bearer ${GRID_TOKEN}`, 'Accept': 'application/json' }
+  });
+  if (!metaResp.ok) throw new Error(`HTTP ${metaResp.status} al pedir metadata del dataset "${name}"`);
+  const meta = await metaResp.json();
+
+  const downloadUrl = meta.download_url || meta.content_url;
+  if (!downloadUrl) throw new Error('El dataset no tiene download_url — puede que N8N todavía no haya publicado nada');
+
+  const dataResp = await fetch(downloadUrl, {
+    headers: { 'Authorization': `Bearer ${GRID_TOKEN}`, 'Accept': 'application/json' }
+  });
+  if (!dataResp.ok) throw new Error(`HTTP ${dataResp.status} al descargar el contenido del dataset`);
+  const json = await dataResp.json();
+  return Array.isArray(json) ? json : (json.rows || json.data || []);
+}
+
+// ─── PROCESAMIENTO DE DATA ───────────────────────────────────────────────────
+function processStageData(rawRows) {
+  const byDock = {};
+  let maxUpdatedAt = null;
+
+  rawRows.forEach(row => {
+    const ubicacion = row.UBICACION || row.POSICION;
+    const parsed    = parseStagePos(ubicacion);
+
+    if (row.UPDATED_AT) {
+      const d = new Date(row.UPDATED_AT);
+      if (!isNaN(d) && (!maxUpdatedAt || d > maxUpdatedAt)) maxUpdatedAt = d;
+    }
+    if (!parsed) return; // ignora BANCADA (WT-) y otros
+
+    const { dock, pos } = parsed;
+    if (!byDock[dock]) byDock[dock] = [];
+
+    const hrs    = parseFloat(row.HORAS_EN_PROCESO_SLA ?? row.HORAS_EN_PROCESO) || 0;
+    const bucket = (row.SEMAFORO_SLA && SEMAFORO_MAP[row.SEMAFORO_SLA]) || ageBucket(hrs);
+
+    let dokaNum = dock;
+    if (row.DOCK_WMS != null) {
+      dokaNum = parseInt(String(row.DOCK_WMS)) || dock;
+    } else if (row.DOCA_DE_ARRIBO) {
+      const dp = String(row.DOCA_DE_ARRIBO).split('-');
+      if (dp.length >= 3) dokaNum = parseInt(dp[2]) || dock;
+    }
+    const doca = `DK-0-${String(dokaNum).padStart(3,'0')}-000-00-00`;
+
+    byDock[dock].push({
+      POSICION:     ubicacion,
+      LP:           row.PALLET_ID || row.LP || ubicacion,
+      dock, pos,
+      dokaNum,
+      doca,
+      hoursInStage: hrs,
+      ageBucket:    bucket,
+      seller:       row.SELLER || row.TIPO_PROVEEDOR || '—',
+      inboundId:    row.INBOUND_ID || row.INBOUND || null,
+      rep:          row.OPERARIO_LDAP || (row.OPERARIO_USER_ID != null ? ('#' + row.OPERARIO_USER_ID) : null),
+      klass:        null, // lo asigna el layout según dock range
+    });
+  });
+  return { byDock, maxUpdatedAt };
+}
+
+// ─── DATOS SINTÉTICOS DE FALLBACK (solo si Grid nunca tuvo datos) ───────────
+const SYNTH_SELLERS = ['Samsung','LG Store','Motorola','Xiaomi','Philips','Sony','Whirlpool','Nestlé'];
+function synthHours(dockStart, i) {
+  const seed = (dockStart*131 + i*17 + 7) % 100;
+  if (seed < 45) return 1 + (seed % 16);
+  if (seed < 75) return 18 + (seed % 6);
+  if (seed < 90) return 24 + (seed % 12);
+  return 36 + (seed % 10);
+}
+
+// ─── BUILD LAYOUT WITH DATA ──────────────────────────────────────────────────
+function buildLayoutWithData(rawRows) {
+  const processed = rawRows ? processStageData(rawRows) : null;
+  const byDock     = processed ? processed.byDock : null;
+  const isSynth    = !processed;
+
+  const layout = STAGE_LAYOUT.map(item => {
+    if (item.kind === 'anden') {
+      const pallets = [];
+      for (let d = item.dockStart; d <= item.dockEnd; d++) {
+        if (isSynth) {
+          const cap = Math.round((item.rows * item.cols) / (item.dockEnd - item.dockStart + 1) * 0.65);
+          for (let i = 0; i < cap; i++) {
+            const hrs = synthHours(d, i);
+            pallets.push({
+              POSICION: `SI-0-${String(d).padStart(3,'0')}-${String(i+1).padStart(3,'0')}-00-00`,
+              LP: `SYN-${d}-${i+1}`,
+              dock: d, pos: i+1, dokaNum: d,
+              doca: `DK-0-${String(d).padStart(3,'0')}-000-00-00`,
+              hoursInStage: hrs, ageBucket: ageBucket(hrs),
+              seller: SYNTH_SELLERS[((d*13)+i) % SYNTH_SELLERS.length],
+              klass: item.klass,
+              row: (i % MAX_ROWS), col: Math.floor(i / MAX_ROWS),
+              andenRange: item.dockRange,
+            });
+          }
+        } else {
+          const dockCount    = item.dockEnd - item.dockStart + 1;
+          const dockIdx      = d - item.dockStart;
+          const baseCols     = Math.floor(item.cols / dockCount);
+          const extraCols    = item.cols % dockCount;
+          const dockColCount = baseCols + (dockIdx === dockCount - 1 ? extraCols : 0);
+          const prevCols     = dockIdx * baseCols;
+
+          (byDock[d] || []).forEach((p, pIdx) => {
+            const localCol = Math.floor(pIdx / MAX_ROWS);
+            if (localCol >= dockColCount) return;
+            const localRow = pIdx % MAX_ROWS;
+            const col = item.cols - 1 - (prevCols + localCol);
+            // Orden real de WMS: cada columna se llena de abajo hacia arriba
+            // (posición 1 abajo, 10 arriba, 11 vuelve a empezar abajo en la
+            // siguiente columna) — sin zigzag entre columnas.
+            const row = localRow;
+            pallets.push({ ...p, klass: p.klass || item.klass, andenRange: item.dockRange, row, col });
+          });
+        }
+      }
+      const cnt = { green:0, yellow:0, red:0, burnt:0 };
+      pallets.forEach(p => cnt[p.ageBucket]++);
+      return { ...item, pallets, occupied: pallets.length, synthetic: isSynth, bucketCounts: cnt };
+    }
+
+    if (item.kind === 'buffer' && item.bufferDocks) {
+      const bufferPallets = [];
+      item.bufferDocks.forEach(d => {
+        if (isSynth) {
+          const cap = Math.round((item.capacity / item.bufferDocks.length) * 0.6);
+          for (let i = 0; i < cap; i++) {
+            const hrs = synthHours(d, i);
+            bufferPallets.push({
+              LP: `SYN-BUF-${d}-${i}`, dock: d, pos: i+1,
+              doca: `DK-0-${String(d).padStart(3,'0')}-000-00-00`,
+              hoursInStage: hrs, ageBucket: ageBucket(hrs),
+              seller: SYNTH_SELLERS[((d*7)+i) % SYNTH_SELLERS.length],
+              klass: item.klass, andenRange: item.dockRange,
+            });
+          }
+        } else {
+          (byDock[d] || []).forEach(p => {
+            bufferPallets.push({ ...p, klass: item.klass, andenRange: item.dockRange });
+          });
+        }
+      });
+      const cnt = { green:0, yellow:0, red:0, burnt:0 };
+      bufferPallets.forEach(p => cnt[p.ageBucket]++);
+      return { ...item, bufferPallets, bufferOccupied: bufferPallets.length, synthetic: isSynth, bucketCounts: cnt };
+    }
+
+    return item;
+  });
+
+  return { layout, isSynth, maxUpdatedAt: processed ? processed.maxUpdatedAt : null };
+}
+
+function collectAllPallets(layout) {
+  const out = [];
+  layout.forEach(item => {
+    if (item.kind === 'anden' && item.pallets) out.push(...item.pallets);
+    if (item.kind === 'buffer' && item.bufferPallets) out.push(...item.bufferPallets.map(p => ({ ...p, isBuffer:true })));
+  });
+  return out;
+}
+
+// ─── THREE.JS SETUP ──────────────────────────────────────────────────────────
+const canvas   = document.getElementById('three-canvas');
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x07080e);
+
+function sidebarWidth() {
+  const panel = document.getElementById('urgent-panel');
+  if (window.innerWidth <= 900) return 0; // overlay, no resta ancho al canvas
+  return panel.offsetWidth || 290;
+}
+
+const camera   = new THREE.PerspectiveCamera(38, (window.innerWidth-sidebarWidth())/window.innerHeight, 0.1, 500);
+camera.position.set(0, 18, 22);
+camera.lookAt(0, 0, 7);
+
+// Sin shadow map: para un tablero operativo visto desde arriba las sombras no
+// aportan información y son el mayor costo de GPU con muchos pallets — se
+// desactivan para que la página abra fluida en notebooks sin GPU dedicada.
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setSize(window.innerWidth-sidebarWidth(), window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
+dirLight.position.set(30, 40, 30);
+scene.add(dirLight);
+
+// ─── Geometrías y materiales COMPARTIDOS (creados una sola vez) ─────────────
+// Antes: cada pallet creaba su propia BoxGeometry + MeshStandardMaterial →
+// con cientos de pallets eso son cientos de objetos GPU únicos. Ahora se
+// reutilizan 3 geometrías y un puñado de materiales vía InstancedMesh.
+const palletBaseGeo = new THREE.BoxGeometry(1.0, 0.12, 1.0);
+const palletWoodMat = new THREE.MeshLambertMaterial({ color:0x7a4d21 });
+const cargoGeo = new THREE.BoxGeometry(0.9, 0.75, 0.9);
+const toteGeo  = new THREE.BoxGeometry(0.75, 0.6, 0.75);
+const bucketMatCache = {};
+function getBucketMat(bucket) {
+  if (!bucketMatCache[bucket]) {
+    bucketMatCache[bucket] = new THREE.MeshLambertMaterial({ color: BUCKET_HEX[bucket] });
+  }
+  return bucketMatCache[bucket];
+}
+
+const interactableMeshes = [];   // InstancedMesh[] usados para raycast
+const palletPositionMap  = new Map(); // LP/POSICION -> {x,z} para centrar selección
+let   allPallets          = [];
+let   totalWidth3D        = 0;
+let   cameraXTarget = 15, cameraXCurrent = 15;
+
+// ─── ANIMACIÓN DE FUEGO — pallets quemados (≥24h) ───────────────────────────
+// Se pidió una señal aún más directa que el color rojo/quemado para que un
+// jefe de turno vea "esto se está quemando" de un vistazo. Se usan Sprites
+// (siempre miran a cámara, no requieren shader propio) sobre un lienzo con un
+// degradé de llama, más un puñado de "brasas" que suben y se desvanecen.
+// Se limita la cantidad de sprites para no pagar costo extra si hay cientos
+// de pallets quemados a la vez — el color/instancing ya cubre esos casos.
+const MAX_FLAME_SPRITES = 150;
+function createFlameTexture() {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(32,40,2,32,30,30);
+  g.addColorStop(0,   'rgba(255,255,200,1)');
+  g.addColorStop(0.25,'rgba(255,220,80,0.95)');
+  g.addColorStop(0.55,'rgba(255,120,20,0.75)');
+  g.addColorStop(0.8, 'rgba(255,40,0,0.35)');
+  g.addColorStop(1,   'rgba(255,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(cv);
+}
+function createEmberTexture() {
+  const cv = document.createElement('canvas'); cv.width = 32; cv.height = 32;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(16,16,0,16,16,16);
+  g.addColorStop(0,   'rgba(255,255,220,1)');
+  g.addColorStop(0.4, 'rgba(255,180,60,0.9)');
+  g.addColorStop(1,   'rgba(255,80,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,32,32);
+  return new THREE.CanvasTexture(cv);
+}
+const flameTexture  = createFlameTexture();
+const emberTexture  = createEmberTexture();
+const flameMaterial = new THREE.SpriteMaterial({ map:flameTexture, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false });
+const emberMaterial = new THREE.SpriteMaterial({ map:emberTexture, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false });
+let flameSprites = [];
+let emberSprites = [];
+let fireAnimEnabled = true;
+try { fireAnimEnabled = localStorage.getItem('stage3d_fire') !== '0'; } catch(e) {}
+
+function addFireEffect(x, topY, z) {
+  const flame = new THREE.Sprite(flameMaterial);
+  flame.position.set(x, topY, z);
+  flame.scale.set(0.55, 0.75, 1);
+  flame.userData.phase = Math.random() * Math.PI * 2;
+  flame.userData.baseY = topY;
+  scene.add(flame);
+  flameSprites.push(flame);
+
+  for (let e = 0; e < 2; e++) {
+    const ember = new THREE.Sprite(emberMaterial.clone());
+    const ex = x + (Math.random()-0.5)*0.3;
+    const ez = z + (Math.random()-0.5)*0.3;
+    ember.position.set(ex, topY, ez);
+    ember.scale.set(0.12, 0.12, 1);
+    ember.userData.phase = Math.random();
+    ember.userData.baseX = ex; ember.userData.baseY = topY; ember.userData.baseZ = ez;
+    scene.add(ember);
+    emberSprites.push(ember);
+  }
+}
+
+// Recursos creados por-build que sí hay que liberar entre refrescos
+// (geometrías/materiales de piso, paredes y sus texturas canvas).
+let disposableResources = [];
+let activeInstancedMeshes = [];
+
+const selectionGroup = new THREE.Group();
+const ringMesh = new THREE.Mesh(new THREE.RingGeometry(0.6,0.85,32), new THREE.MeshBasicMaterial({color:0x00f3ff,side:THREE.DoubleSide,transparent:true,opacity:0.9}));
+ringMesh.rotation.x = -Math.PI/2; ringMesh.position.y = 0.02; selectionGroup.add(ringMesh);
+const arrowMesh = new THREE.Mesh(new THREE.ConeGeometry(0.35,0.7,4), new THREE.MeshBasicMaterial({color:0x00f3ff}));
+arrowMesh.rotation.x = Math.PI; arrowMesh.position.y = 2.5; selectionGroup.add(arrowMesh);
+selectionGroup.visible = false; scene.add(selectionGroup);
+
+// ─── TEXTURA DE MURO 3D ───────────────────────────────────────────────────────
+function createWallTexture(item, widthPx, heightPx) {
+  const cv = document.createElement('canvas');
+  cv.width = widthPx; cv.height = heightPx;
+  const ctx = cv.getContext('2d');
+
+  ctx.fillStyle = item.kind === 'zone-gray' ? '#121526' : '#0d0f1b';
+  ctx.fillRect(0,0,widthPx,heightPx);
+
+  // Franja de alerta si la zona está muy ocupada y con muchos pallets viejos
+  const cnt = item.bucketCounts;
+  if (cnt) {
+    const occ  = item.kind === 'anden' ? item.occupied : item.bufferOccupied;
+    const cap  = item.capacity || 1;
+    const hot  = (occ / cap) > 0.85 && ((cnt.red + cnt.burnt) / Math.max(occ,1)) > 0.3;
+    if (hot) {
+      ctx.fillStyle = 'rgba(255,42,42,0.55)';
+      ctx.fillRect(0,0,widthPx,8);
+    }
+  }
+
+  ctx.strokeStyle = '#1e243d'; ctx.lineWidth = 6;
+  ctx.strokeRect(3,3,widthPx-6,heightPx-6);
+  ctx.textAlign = 'center';
+
+  if (item.kind === 'anden') {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px "Segoe UI", sans-serif';
+    ctx.fillText(item.dockRange, widthPx/2, 45);
+    const kc = KLASS_COLOR[item.klass] || '#3498db';
+    ctx.fillStyle = kc;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(widthPx/2-45, 58, 90, 26, 6);
+    else ctx.rect(widthPx/2-45, 58, 90, 26);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px "Segoe UI", sans-serif';
+    ctx.fillText(item.klass, widthPx/2, 77);
+    ctx.fillStyle = '#f39c12';
+    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    ctx.fillText(`${item.occupied||0}/${item.capacity} p`, widthPx/2, 118);
+
+  } else if (item.kind === 'buffer') {
+    const kc = KLASS_COLOR[item.klass] || '#f39c12';
+    ctx.fillStyle = kc;
+    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    ctx.fillText(item.label, widthPx/2, 48);
+    ctx.fillStyle = '#f39c12';
+    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    const occ = item.bufferOccupied !== undefined ? item.bufferOccupied : '?';
+    ctx.fillText(`${occ}/${item.capacity}`, widthPx/2, 88);
+    ctx.fillStyle = '#5d6d8a';
+    ctx.font = 'bold 14px "Segoe UI", sans-serif';
+    ctx.fillText('totes/pallets', widthPx/2, 110);
+
+  } else if (item.kind === 'zone-gray') {
+    ctx.fillStyle = '#8a99ad';
+    ctx.font = 'bold 18px "Segoe UI", sans-serif';
+    ctx.fillText(item.label, widthPx/2, 70);
+  }
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+
+// ─── LIMPIEZA CON LIBERACIÓN DE RECURSOS ────────────────────────────────────
+// Como ya no recargamos la página completa en cada refresco, hay que liberar
+// a mano lo que se recrea en cada build (texturas de muro, geometrías de piso)
+// para que la memoria de GPU no crezca sin límite en una pantalla encendida
+// 24/7. Las geometrías/materiales COMPARTIDOS de pallets nunca se liberan acá.
+function clearScene() {
+  while (scene.children.length > 0) scene.remove(scene.children[0]);
+  disposableResources.forEach(r => { try { r.dispose(); } catch(e) {} });
+  disposableResources = [];
+  activeInstancedMeshes = [];
+  interactableMeshes.length = 0;
+  palletPositionMap.clear();
+  // Los sprites de fuego se recrean en cada build; las brasas usan un
+  // material CLONADO por instancia (para poder animar su opacidad por
+  // separado), así que sí hay que liberarlo. El material de la llama es
+  // compartido a propósito y nunca se libera.
+  emberSprites.forEach(e => { try { e.material.dispose(); } catch(err) {} });
+  flameSprites = [];
+  emberSprites = [];
+  allPallets.length = 0;
+  scene.background = new THREE.Color(0x07080e);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.75);
+  dl.position.set(30,40,30); scene.add(dl);
+  selectionGroup.visible = false;
+  scene.add(selectionGroup);
+}
+
+function buildScene(layoutWithData) {
+  clearScene();
+  let currentX3D = 0;
+  const floorDepth3D = MAX_ROWS * CELL_3D_SIZE;
+
+  const baseTransforms = [];
+  const cargoGroups = { green:[], yellow:[], red:[], burnt:[] };
+  const toteGroups  = { green:[], yellow:[], red:[], burnt:[] };
+
+  layoutWithData.forEach(item => {
+    const cols     = item.cols || 2;
+    const width3D  = cols * CELL_3D_SIZE;
+    const cxCenter = currentX3D + width3D / 2;
+    const czCenter = floorDepth3D / 2;
+
+    let floorColor = 0x111526;
+    if (item.kind === 'zone-gray') floorColor = 0x0a0c16;
+    if (item.kind === 'buffer')    floorColor = 0x181e36;
+    const floorGeo  = new THREE.PlaneGeometry(width3D, floorDepth3D);
+    const floorMat  = new THREE.MeshLambertMaterial({color:floorColor});
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI/2;
+    floorMesh.position.set(cxCenter, 0, czCenter);
+    scene.add(floorMesh);
+    disposableResources.push(floorGeo, floorMat);
+
+    const edgeGeo = new THREE.EdgesGeometry(floorGeo);
+    const edgeMat = new THREE.LineBasicMaterial({color:item.kind==='anden'?0x222b48:0x1c2135});
+    const outline = new THREE.LineSegments(edgeGeo, edgeMat);
+    outline.rotation.x = -Math.PI/2;
+    outline.position.set(cxCenter, 0.005, czCenter);
+    scene.add(outline);
+    disposableResources.push(edgeGeo, edgeMat);
+
+    if (item.kind !== 'se') {
+      const wallH   = 2.2;
+      const wallTex  = createWallTexture(item, Math.round(width3D*120), Math.round(wallH*120));
+      const wallGeo  = new THREE.PlaneGeometry(width3D,wallH);
+      const wallMat  = new THREE.MeshBasicMaterial({map:wallTex,side:THREE.DoubleSide});
+      const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+      wallMesh.position.set(cxCenter, wallH/2, -0.05);
+      scene.add(wallMesh);
+      disposableResources.push(wallTex, wallGeo, wallMat);
+
+      const frameGeo = new THREE.BoxGeometry(width3D+0.1,wallH+0.1,0.1);
+      const frameMat = new THREE.MeshLambertMaterial({color:0x1a2035});
+      const frame = new THREE.Mesh(frameGeo, frameMat);
+      frame.position.set(cxCenter, wallH/2, -0.11);
+      scene.add(frame);
+      disposableResources.push(frameGeo, frameMat);
+    }
+
+    if (item.kind === 'anden' && item.pallets) {
+      item.pallets.forEach(p => {
+        const px = currentX3D + (p.col + 0.5) * CELL_3D_SIZE;
+        const pz = (MAX_ROWS - 1 - p.row + 0.5) * CELL_3D_SIZE;
+        baseTransforms.push({x:px,z:pz});
+        cargoGroups[p.ageBucket].push({x:px,z:pz,pallet:p});
+        palletPositionMap.set(p.LP || p.POSICION, {x:px,z:pz});
+        allPallets.push(p);
+      });
+    }
+
+    if (item.kind === 'buffer' && item.bufferPallets && item.bufferPallets.length > 0) {
+      const bRows = item.rows || MAX_ROWS;
+      const bCols = item.cols || 2;
+      const positions = snakePositions(bRows, bCols, item.bufferPallets.length);
+      item.bufferPallets.forEach((p, i) => {
+        if (i >= positions.length) return;
+        const { row, col } = positions[i];
+        const px = currentX3D + (col + 0.5) * CELL_3D_SIZE;
+        const pz = (bRows - 1 - row + 0.5) * CELL_3D_SIZE;
+        const pWithFlag = { ...p, isBuffer:true };
+        toteGroups[p.ageBucket].push({x:px,z:pz,pallet:pWithFlag});
+        palletPositionMap.set(p.LP || p.POSICION, {x:px,z:pz});
+        allPallets.push(pWithFlag);
+      });
+    }
+
+    currentX3D += width3D + GAP_3D;
+  });
+
+  totalWidth3D = currentX3D;
+
+  // ─── Instancing: un puñado de draw-calls sin importar cuántos pallets haya ──
+  if (baseTransforms.length) {
+    const baseMesh = new THREE.InstancedMesh(palletBaseGeo, palletWoodMat, baseTransforms.length);
+    const m = new THREE.Matrix4();
+    baseTransforms.forEach((t,i) => { m.setPosition(t.x, 0.06, t.z); baseMesh.setMatrixAt(i,m); });
+    baseMesh.instanceMatrix.needsUpdate = true;
+    scene.add(baseMesh);
+    activeInstancedMeshes.push(baseMesh);
+  }
+  BUCKET_ORDER.forEach(bucket => {
+    const cargoArr = cargoGroups[bucket];
+    if (cargoArr.length) {
+      const mesh = new THREE.InstancedMesh(cargoGeo, getBucketMat(bucket), cargoArr.length);
+      const m = new THREE.Matrix4();
+      cargoArr.forEach((t,i) => { m.setPosition(t.x, 0.12 + 0.75/2, t.z); mesh.setMatrixAt(i,m); });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.userData.items = cargoArr;
+      scene.add(mesh);
+      activeInstancedMeshes.push(mesh);
+      interactableMeshes.push(mesh);
+    }
+    const toteArr = toteGroups[bucket];
+    if (toteArr.length) {
+      const mesh = new THREE.InstancedMesh(toteGeo, getBucketMat(bucket), toteArr.length);
+      const m = new THREE.Matrix4();
+      toteArr.forEach((t,i) => { m.setPosition(t.x, 0.3, t.z); mesh.setMatrixAt(i,m); });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.userData.items = toteArr;
+      scene.add(mesh);
+      activeInstancedMeshes.push(mesh);
+      interactableMeshes.push(mesh);
+    }
+  });
+
+  // ─── Fuego sobre los pallets/totes quemados (≥24h) ──────────────────────
+  if (fireAnimEnabled) {
+    const CARGO_TOP = 0.12 + 0.75 + 0.06;
+    const TOTE_TOP  = 0.3 + 0.3 + 0.06;
+    let flameBudget = MAX_FLAME_SPRITES;
+    for (const t of cargoGroups.burnt) {
+      if (flameBudget-- <= 0) break;
+      addFireEffect(t.x, CARGO_TOP, t.z);
+    }
+    for (const t of toteGroups.burnt) {
+      if (flameBudget-- <= 0) break;
+      addFireEffect(t.x, TOTE_TOP, t.z);
+    }
+  }
+}
+
+// ─── ESTADO DE FILTROS / UI ──────────────────────────────────────────────────
+const uiState = { bucketFilter: null, klassFilter: '', search: '', prevBurnt: null, prevKeys: new Set() };
+
+function passesFilter(p) {
+  if (uiState.bucketFilter && p.ageBucket !== uiState.bucketFilter) return false;
+  if (uiState.klassFilter && p.klass !== uiState.klassFilter) return false;
+  if (uiState.search) {
+    const q = uiState.search.toLowerCase();
+    const hay = `${p.LP||''} ${p.POSICION||''} ${p.seller||''} ${p.andenRange||''} ${p.klass||''}`.toLowerCase();
+    if (hay.indexOf(q) === -1) return false;
+  }
+  return true;
+}
+
+function populateKlassOptions(pallets) {
+  const sel = document.getElementById('f-klass');
+  const current = sel.value;
+  const klasses = Array.from(new Set(pallets.map(p => p.klass).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">Todas las zonas</option>' + klasses.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+  if (klasses.indexOf(current) !== -1) sel.value = current;
+}
+
+// ─── UI: PANEL URGENTES ────────────────────────────────────────────────────────
+function updateUI(pallets, isSynth, maxUpdatedAt) {
+  const cnt = { green:0, yellow:0, red:0, burnt:0 };
+  pallets.forEach(p => cnt[p.ageBucket]++);
+  const occupancyPct = pallets.length ? Math.round((cnt.burnt+cnt.red+cnt.yellow+cnt.green) > 0 ? 100 : 0) : 0;
+
+  document.getElementById('topbar-kpis').innerHTML = `
+    <div class="tk" title="${BKT_LABEL.burnt}">${BKT_ICON.burnt}<span class="tk-v" style="color:var(--burnt)">${cnt.burnt}</span><span class="tk-lbl">≥24h</span></div>
+    <div class="tk" title="${BKT_LABEL.red}">${BKT_ICON.red}<span class="tk-v" style="color:var(--red)">${cnt.red}</span><span class="tk-lbl">20-24h</span></div>
+    <div class="tk" title="${BKT_LABEL.yellow}">${BKT_ICON.yellow}<span class="tk-v" style="color:var(--yellow)">${cnt.yellow}</span><span class="tk-lbl">16-20h</span></div>
+    <div class="tk" title="${BKT_LABEL.green}">${BKT_ICON.green}<span class="tk-v" style="color:var(--green)">${cnt.green}</span><span class="tk-lbl">&lt;16h</span></div>
+    <div class="occ-chip" title="Capacidad total sumando todos los andenes y buffers del layout"><b>${pallets.length}</b> / <b>${TOTAL_CAPACITY}</b> pallets en Stage${isSynth?' · demo':''}</div>
+  `;
+
+  // Badge de día no hábil (informativo — ver nota sobre backend)
+  const day = isNonWorkingToday();
+  const dayBadge = document.getElementById('day-badge');
+  if (day.pause) {
+    dayBadge.classList.add('show');
+    dayBadge.textContent = day.isSunday ? '⏸ Domingo — SLA en pausa' : '⏸ Feriado — SLA en pausa';
+  } else {
+    dayBadge.classList.remove('show');
+  }
+
+  // Frescura del dato real (según UPDATED_AT del propio dataset, no el reloj del navegador)
+  const freshEl = document.getElementById('freshness');
+  if (maxUpdatedAt) {
+    const minsAgo = Math.round((Date.now() - maxUpdatedAt.getTime()) / 60000);
+    freshEl.textContent = `· dato de hace ${minsAgo <= 0 ? '<1' : minsAgo} min`;
+    freshEl.className = 'freshness' + (minsAgo > 20 ? ' dead' : minsAgo > 12 ? ' stale' : '');
+  } else {
+    freshEl.textContent = isSynth ? '· sin dato real' : '· —';
+    freshEl.className = 'freshness';
+  }
+
+  document.getElementById('urg-ts').textContent = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+
+  const burntFlash = uiState.prevBurnt !== null && cnt.burnt > uiState.prevBurnt;
+  document.getElementById('urg-counters').innerHTML = `
+    <button class="urg-ct burnt${uiState.bucketFilter==='burnt'?' active':''}" data-bucket="burnt"><div class="urg-ct-v${burntFlash?' flash':''}">${cnt.burnt}</div><div class="urg-ct-l">≥24h</div></button>
+    <button class="urg-ct red${uiState.bucketFilter==='red'?' active':''}" data-bucket="red"><div class="urg-ct-v">${cnt.red}</div><div class="urg-ct-l">20-24h</div></button>
+    <button class="urg-ct yellow${uiState.bucketFilter==='yellow'?' active':''}" data-bucket="yellow"><div class="urg-ct-v">${cnt.yellow}</div><div class="urg-ct-l">16-20h</div></button>
+    <button class="urg-ct green${uiState.bucketFilter==='green'?' active':''}" data-bucket="green"><div class="urg-ct-v">${cnt.green}</div><div class="urg-ct-l">&lt;16h</div></button>
+  `;
+  document.querySelectorAll('.urg-ct').forEach(btn => btn.addEventListener('click', () => {
+    const b = btn.getAttribute('data-bucket');
+    uiState.bucketFilter = (uiState.bucketFilter === b) ? null : b;
+    renderUrgentList();
+  }));
+  if (window.Audio || window.AudioContext) playBeepIfEnabled(burntFlash);
+  uiState.prevBurnt = cnt.burnt;
+
+  // Rollup de zonas críticas: qué klass concentra más pallets rojos/quemados
+  const byKlass = {};
+  pallets.forEach(p => {
+    const k = p.klass || '—';
+    if (!byKlass[k]) byKlass[k] = { burnt:0, red:0, total:0 };
+    byKlass[k].total++;
+    if (p.ageBucket === 'burnt') byKlass[k].burnt++;
+    if (p.ageBucket === 'red') byKlass[k].red++;
+  });
+  const topKlass = Object.entries(byKlass)
+    .filter(([,v]) => v.burnt + v.red > 0)
+    .sort((a,b) => (b[1].burnt*10+b[1].red) - (a[1].burnt*10+a[1].red))
+    .slice(0,4);
+  const rollupEl = document.getElementById('zone-rollup');
+  rollupEl.innerHTML = topKlass.length
+    ? topKlass.map(([k,v]) => `<span class="zr-chip" data-klass="${escapeHtml(k)}" style="border-color:${KLASS_COLOR[k]||'#333'}">${escapeHtml(k)} · 🔥${v.burnt} ⛔${v.red}</span>`).join('')
+    : '';
+  rollupEl.querySelectorAll('.zr-chip').forEach(chip => chip.addEventListener('click', () => {
+    document.getElementById('f-klass').value = chip.getAttribute('data-klass');
+    uiState.klassFilter = chip.getAttribute('data-klass');
+    renderUrgentList();
+  }));
+
+  populateKlassOptions(pallets);
+  renderUrgentList();
+}
+
+function renderUrgentList() {
+  const urgList = document.getElementById('urg-list');
+  const filtered = allPallets.filter(passesFilter).sort((a,b) => b.hoursInStage - a.hoursInStage);
+  document.getElementById('urg-count-line').textContent = `Mostrando ${filtered.length} de ${allPallets.length} pallets`;
+
+  urgList.innerHTML = '';
+  if (!filtered.length) {
+    urgList.innerHTML = '<div class="empty-hint">Sin resultados para este filtro.</div>';
+    return;
+  }
+
+  const currentKeys = new Set();
+  filtered.forEach(p => {
+    const key = p.LP || p.POSICION || '';
+    currentKeys.add(key);
+    const li   = document.createElement('div');
+    const isNew = p.ageBucket !== 'green' && uiState.prevKeys.size && !uiState.prevKeys.has(key);
+    li.className = 'urg-item ' + p.ageBucket + (isNew ? ' is-new' : '');
+    const kc   = KLASS_COLOR[p.klass] || '#666';
+    const lpId = p.LP || p.POSICION || '—';
+    const lpShown = escapeHtml(lpId.length > 16 ? lpId.slice(0,16)+'…' : lpId);
+    li.innerHTML = `
+      <div class="ui-row1">
+        <span class="ui-hrs ${p.ageBucket}">${p.hoursInStage.toFixed(1)}h</span>
+        <span class="ui-id">${lpShown}</span>
+        <span class="ui-range">${escapeHtml(p.andenRange||'')}</span>
+      </div>
+      <div class="ui-row2">
+        <span class="ui-klass" style="background:${kc}33;color:${kc}">${escapeHtml(p.klass||'?')}</span>
+        <span class="ui-seller">${escapeHtml(p.seller||'—')}</span>
+      </div>
+    `;
+    li.addEventListener('click', () => selectPallet(p));
+    urgList.appendChild(li);
+  });
+  uiState.prevKeys = currentKeys;
+}
+
+document.getElementById('f-search').addEventListener('input', e => { uiState.search = e.target.value; renderUrgentList(); });
+document.getElementById('f-klass').addEventListener('change', e => { uiState.klassFilter = e.target.value; renderUrgentList(); });
+document.getElementById('f-clear').addEventListener('click', () => {
+  uiState.search = ''; uiState.klassFilter = ''; uiState.bucketFilter = null;
+  document.getElementById('f-search').value = '';
+  document.getElementById('f-klass').value = '';
+  document.querySelectorAll('.urg-ct').forEach(b => b.classList.remove('active'));
+  renderUrgentList();
+});
+
+// ─── ALERTA SONORA OPCIONAL (sin archivos externos, WebAudio) ───────────────
+let soundEnabled = false;
+try { soundEnabled = localStorage.getItem('stage3d_sound') === '1'; } catch(e) {}
+function playBeepIfEnabled(shouldBeep) {
+  if (!soundEnabled || !shouldBeep) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880; gain.gain.value = 0.05;
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.18);
+  } catch(e) {}
+}
+const btnSound = document.getElementById('btn-sound');
+btnSound.classList.toggle('active', soundEnabled);
+btnSound.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  btnSound.classList.toggle('active', soundEnabled);
+  try { localStorage.setItem('stage3d_sound', soundEnabled ? '1' : '0'); } catch(e) {}
+});
+
+// ─── MODO TV (pantallas de piso vistas a distancia) ─────────────────────────
+let tvMode = false;
+try { tvMode = localStorage.getItem('stage3d_tv') === '1'; } catch(e) {}
+const btnTv = document.getElementById('btn-tv');
+function applyTvMode() {
+  document.body.classList.toggle('tv-mode', tvMode);
+  btnTv.classList.toggle('active', tvMode);
+}
+applyTvMode();
+btnTv.addEventListener('click', () => {
+  tvMode = !tvMode;
+  applyTvMode();
+  try { localStorage.setItem('stage3d_tv', tvMode ? '1' : '0'); } catch(e) {}
+  onResize();
+});
+
+// ─── TOGGLE: animación de fuego ──────────────────────────────────────────────
+const btnFire = document.getElementById('btn-fire');
+btnFire.classList.toggle('active', fireAnimEnabled);
+btnFire.addEventListener('click', () => {
+  fireAnimEnabled = !fireAnimEnabled;
+  btnFire.classList.toggle('active', fireAnimEnabled);
+  try { localStorage.setItem('stage3d_fire', fireAnimEnabled ? '1' : '0'); } catch(e) {}
+  // Reconstruye la escena con los datos ya cargados (sin volver a pedirlos a
+  // Grid) para agregar/quitar los sprites de fuego al instante.
+  render(lastRenderedRows, lastRenderedIsSynth);
+});
+
+// ─── SIDEBAR RESPONSIVE (notebooks/tablets angostas) ────────────────────────
+document.getElementById('btn-sidebar').addEventListener('click', () => {
+  document.getElementById('urgent-panel').classList.toggle('open');
+});
+
+// ─── MODAL DE AYUDA ──────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.getElementById('btn-help').addEventListener('click', () => openModal('help-backdrop'));
+document.getElementById('help-close').addEventListener('click', () => closeModal('help-backdrop'));
+document.getElementById('help-backdrop').addEventListener('click', e => {
+  if (e.target.id === 'help-backdrop') closeModal('help-backdrop');
+});
+document.getElementById('visits-close').addEventListener('click', () => closeModal('visits-backdrop'));
+document.getElementById('visits-backdrop').addEventListener('click', e => {
+  if (e.target.id === 'visits-backdrop') closeModal('visits-backdrop');
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeModal('help-backdrop');
+  closeModal('visits-backdrop');
+});
+
+// ─── LIBRO DE VISITAS (LDAP automático + duración de sesión) ────────────────
+// No pide nombre a nadie: apenas carga la página, resuelve solo quién sos
+// (tu usuario de CD) preguntándole a Grid quién tiene la sesión
+// abierta en el navegador — el mismo mecanismo que ya usan otros tableros de
+// Grid en la empresa. Guarda cuándo entraste y cuánto tiempo estuviste.
+// El botón 👁 para VER el registro está oculto para todos — solo aparece si
+// tu LDAP está en VISIT_ADMINS. Si algo de esto falla (por ejemplo si Grid
+// no puede resolver el usuario), no rompe el tablero: solo no queda
+// registrada esa visita.
+const VISITS_BUCKET = 'visitas_stage3d';
+const VISIT_ADMINS  = ['ext_julinovo', 'ext_sotclaud']; // Julio Novoa, Claudio Soto
+let vSession = null;
+let vBusy = false;
+
+function vToLdap(email) {
+  if (!email) return null;
+  return String(email).split('@')[0].toLowerCase().trim() || null;
+}
+
+async function vResolveIdentity() {
+  try {
+    const resp = await fetch('/api/v1/me', { credentials: 'include' });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const email = data.email || (data.username ? data.username + '@CD.com' : null) || '';
+    return vToLdap(email);
+  } catch (e) {
+    console.warn('[Visitas] No se pudo resolver el usuario logueado:', e && e.message ? e.message : e);
+    return null;
+  }
+}
+
+// window.name sobrevive mientras la pestaña sigue abierta (incluso si el
+// tablero refresca datos) — así la MISMA visita se sigue actualizando en vez
+// de crear una fila nueva cada vez.
+function vSaveTabState() {
+  if (!vSession) return;
+  try {
+    const d = JSON.parse(window.name || '{}');
+    d._stage3dVisit = vSession;
+    window.name = JSON.stringify(d);
+  } catch(e) {}
+}
+function vLoadTabState() {
+  try {
+    const d = JSON.parse(window.name || '{}');
+    return d._stage3dVisit || null;
+  } catch(e) { return null; }
+}
+
+async function vFlush() {
+  if (!vSession || vBusy) return;
+  if (!window.GRID || !window.GRID.states) return;
+  vBusy = true;
+  try {
+    vSession.end = new Date().toISOString();
+    vSession.duration_min = Math.max(0, Math.round((new Date(vSession.end) - new Date(vSession.start)) / 60000));
+    let base = { visits: [], schema: 1 };
+    try {
+      const body = await window.GRID.states.get(VISITS_BUCKET);
+      if (body && body.state && Array.isArray(body.state.visits)) base = body.state;
+    } catch(e) { /* todavía no existe el estado — primera visita de todas */ }
+    const idx = base.visits.findIndex(v => v.id === vSession.id);
+    if (idx >= 0) base.visits[idx] = { ...vSession };
+    else {
+      base.visits.unshift({ ...vSession });
+      if (base.visits.length > 500) base.visits = base.visits.slice(0, 500);
+    }
+    await window.GRID.states.set(VISITS_BUCKET, base);
+  } catch (e) {
+    console.warn('[Visitas] No se pudo guardar la visita:', e && e.message ? e.message : e);
+  } finally {
+    vBusy = false;
+  }
+}
+
+function vStartSession(ldap) {
+  const now = new Date().toISOString();
+  vSession = { id: Date.now() + '_' + ldap, ldap, start: now, end: now, duration_min: 0 };
+  vSaveTabState();
+  vFlush();
+}
+
+function vRevealAdminButtonIfNeeded(ldap) {
+  if (ldap && VISIT_ADMINS.includes(ldap)) {
+    document.getElementById('btn-visits').style.display = 'flex';
+  }
+}
+
+async function vInit() {
+  const saved = vLoadTabState();
+  if (saved && saved.ldap) {
+    vSession = saved;
+    vFlush();
+    vRevealAdminButtonIfNeeded(saved.ldap);
+    return;
+  }
+  const ldap = await vResolveIdentity();
+  if (ldap) {
+    vStartSession(ldap);
+    vRevealAdminButtonIfNeeded(ldap);
+  } else {
+    console.log('[Visitas] No se pudo identificar el usuario — esta visita no queda registrada.');
+  }
+}
+
+window.addEventListener('beforeunload', () => { if (vSession) vFlush(); });
+setInterval(() => { if (vSession) vFlush(); }, 120000); // late de presencia cada 2 min
+
+// ─── PANEL DE ADMIN: ver el libro de visitas (solo VISIT_ADMINS) ────────────
+const VISIT_STALE_MS = 5 * 60 * 1000; // sin actividad hace más de 5 min = sesión cerrada
+let lastVisitsForCsv = [];
+
+function vFmtDateTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function vFmtDuration(min) {
+  min = Math.max(0, Math.round(min || 0));
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)}h ${min % 60}min`;
+}
+
+async function showVisitsModal() {
+  const summaryEl = document.getElementById('visits-summary');
+  const tbody     = document.getElementById('visits-tbody');
+  summaryEl.textContent = 'Cargando…';
+  tbody.innerHTML = '';
+  let visits = [];
+  try {
+    const body = await window.GRID.states.get(VISITS_BUCKET);
+    if (body && body.state && Array.isArray(body.state.visits)) visits = body.state.visits;
+  } catch (e) {
+    summaryEl.textContent = 'No se pudo cargar el registro (' + (e && e.message ? e.message : 'error de conexión') + ').';
+    return;
+  }
+  lastVisitsForCsv = visits;
+
+  const total  = visits.length;
+  const unique = new Set(visits.map(v => v.ldap)).size;
+  const today  = new Date().toISOString().slice(0, 10);
+  const todayCount = visits.filter(v => (v.start || '').slice(0, 10) === today).length;
+  const avgMin = total ? Math.round(visits.reduce((s, v) => s + (v.duration_min || 0), 0) / total) : 0;
+  summaryEl.innerHTML = `<b>${total}</b> visitas · <b>${unique}</b> usuarios distintos · <b>${todayCount}</b> hoy · promedio <b>${vFmtDuration(avgMin)}</b>`;
+
+  if (!visits.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--sub);padding:16px">Todavía no hay visitas registradas.</td></tr>';
+    return;
+  }
+
+  const now = Date.now();
+  tbody.innerHTML = visits
+    .slice()
+    .sort((a, b) => new Date(b.end || b.start) - new Date(a.end || a.start))
+    .map(v => {
+      const isLive = (now - new Date(v.end || v.start).getTime()) < VISIT_STALE_MS;
+      return `<tr>
+        <td><span class="visits-dot ${isLive ? '' : 'stale'}" title="${isLive ? 'Conectado ahora' : 'Sesión cerrada'}"></span></td>
+        <td>${escapeHtml(v.ldap || '—')}</td>
+        <td>${vFmtDateTime(v.start)}</td>
+        <td>${vFmtDuration(v.duration_min)}</td>
+        <td>${vFmtDateTime(v.end || v.start)}</td>
+      </tr>`;
+    }).join('');
+}
+
+document.getElementById('btn-visits').addEventListener('click', () => {
+  openModal('visits-backdrop');
+  showVisitsModal();
+});
+
+document.getElementById('visits-csv').addEventListener('click', () => {
+  const header = ['ldap', 'inicio', 'fin', 'duracion_min'];
+  const lines = [header.join(',')].concat(
+    lastVisitsForCsv.map(v => [v.ldap, v.start, v.end, v.duration_min]
+      .map(x => `"${String(x ?? '').replace(/"/g, '""')}"`).join(','))
+  );
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `libro_visitas_stage3d_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ─── INTERACCIÓN ─────────────────────────────────────────────────────────────
+const raycaster  = new THREE.Raycaster();
+const mouse      = new THREE.Vector2();
+const tooltipEl  = document.getElementById('hover-tooltip');
+
+function selectPallet(p) {
+  const key = p.LP || p.POSICION;
+  const pos = palletPositionMap.get(key);
+  if (pos) {
+    selectionGroup.position.set(pos.x, 0, pos.z);
+    selectionGroup.visible = true;
+    cameraXTarget = pos.x;
+  }
+  showPopover(p);
+}
+
+function pickPalletAt(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactableMeshes);
+  if (!hits.length) return null;
+  const hit = hits[0];
+  const items = hit.object.userData.items;
+  return items ? items[hit.instanceId].pallet : null;
+}
+
+canvas.addEventListener('click', e => {
+  const p = pickPalletAt(e.clientX, e.clientY);
+  if (p) selectPallet(p);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isDragging) { tooltipEl.style.display = 'none'; return; }
+  const p = pickPalletAt(e.clientX, e.clientY);
+  if (p) {
+    const lbl = escapeHtml(p.LP || p.POSICION || '—');
+    tooltipEl.style.display = 'block';
+    tooltipEl.style.left = (e.clientX+12)+'px';
+    tooltipEl.style.top  = (e.clientY-20)+'px';
+    tooltipEl.innerHTML  = `<b>${lbl}</b> · ${(p.hoursInStage||0).toFixed(1)}h · ${escapeHtml(p.klass||'')}`;
+  } else {
+    tooltipEl.style.display = 'none';
+  }
+});
+
+function showPopover(p) {
+  const pop = document.getElementById('popover');
+  const lpId = p.LP || p.POSICION || '—';
+  const lpShown = escapeHtml(lpId.length > 22 ? lpId.slice(0,22)+'…' : lpId);
+  document.getElementById('pop-title').innerHTML = `
+    <span>${lpShown}</span>
+    <span class="pop-badge ${p.ageBucket}">${BKT_ICON[p.ageBucket]} ${escapeHtml(BKT_LABEL[p.ageBucket])}</span>
+  `;
+  document.getElementById('pop-body').innerHTML = `
+    <div class="pop-row"><span class="pop-lbl">POSICION</span><span class="pop-val" style="font-family:monospace;font-size:.62rem">${escapeHtml(p.POSICION||'—')}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Docka / Andén</span><span class="pop-val">${escapeHtml(p.doca||'—')}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Zona</span><span class="pop-val">${escapeHtml(p.klass||'—')} · ${escapeHtml(p.andenRange||'—')}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Horas en Stage</span><span class="pop-val"><b style="color:var(--cyan)">${(p.hoursInStage||0).toFixed(1)} hs</b></span></div>
+    <div class="pop-row"><span class="pop-lbl">Proveedor</span><span class="pop-val">${escapeHtml(p.seller||'—')}</span></div>
+    <div class="pop-row"><span class="pop-lbl">IS</span><span class="pop-val">${escapeHtml(p.inboundId||'—')}</span></div>
+    <div class="pop-row"><span class="pop-lbl">REP</span><span class="pop-val">${escapeHtml(p.rep||'—')}</span></div>
+    ${p.isBuffer ? '<div class="pop-row"><span class="pop-lbl" style="color:var(--accent)">⚠ En buffer</span><span class="pop-val" style="color:var(--accent)">Esperando proceso</span></div>' : ''}
+  `;
+  pop.style.display = 'block';
+  pop.style.right   = '285px';
+  pop.style.bottom  = '20px';
+}
+function closePopover() {
+  document.getElementById('popover').style.display = 'none';
+  selectionGroup.visible = false;
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePopover(); });
+document.addEventListener('click', e => {
+  const pop = document.getElementById('popover');
+  if (pop.style.display === 'block' && !pop.contains(e.target) && e.target.tagName !== 'CANVAS' && !e.target.closest('.urg-item')) {
+    closePopover();
+  }
+});
+window.closePopover = closePopover;
+
+// ─── NAVEGACIÓN ───────────────────────────────────────────────────────────────
+let isDragging = false, previousMouseX = 0;
+canvas.addEventListener('mousedown', e => { isDragging = true; previousMouseX = e.clientX; });
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  cameraXTarget -= (e.clientX - previousMouseX) * 0.05;
+  previousMouseX = e.clientX;
+});
+canvas.addEventListener('wheel', e => { e.preventDefault(); cameraXTarget += e.deltaY * 0.03; }, {passive:false});
+
+function onResize() {
+  const w = window.innerWidth - sidebarWidth();
+  renderer.setSize(w, window.innerHeight);
+  camera.aspect = w / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+
+function updateCameraPosition() {
+  cameraXTarget  = Math.max(10, Math.min(Math.max(totalWidth3D-10,10), cameraXTarget));
+  cameraXCurrent += (cameraXTarget - cameraXCurrent) * 0.1;
+  camera.position.x = cameraXCurrent;
+  camera.lookAt(cameraXCurrent, 0, 6.5);
+}
+
+// ─── RELOJ ────────────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock-sm').textContent =
+    new Date().toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
+}
+updateClock();
+setInterval(updateClock, 10000);
+
+// ─── ANIMACIÓN ────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+// Glow pulsante sobre la caja de los pallets quemados (barato: una sola
+// actualización de material por frame, afecta a todas las instancias del
+// bucket "burnt" a la vez porque comparten un único MeshLambertMaterial).
+function animateBurntGlow(t) {
+  const burntMat = bucketMatCache['burnt'];
+  if (!burntMat) return;
+  const glow = fireAnimEnabled ? (0.4 + 0.3*Math.sin(t*6) + 0.15*Math.sin(t*13.7)) : 0;
+  burntMat.emissive.setRGB(0.9*glow, 0.25*glow, 0);
+}
+
+// Llamas y brasas: cada sprite tiene su propia fase (userData.phase) para
+// que no titilen todas en sincronía — se ve más orgánico y menos "led".
+function animateFire(t) {
+  for (const f of flameSprites) {
+    const ph = f.userData.phase;
+    const flicker = 0.85 + 0.25*Math.sin(t*8 + ph) + 0.1*Math.sin(t*18.4 + ph);
+    f.scale.set(0.5*flicker, 0.7*flicker*(1 + 0.06*Math.sin(t*5+ph)), 1);
+    f.position.y = f.userData.baseY + Math.sin(t*6+ph)*0.03;
+  }
+  for (const e of emberSprites) {
+    const ph = e.userData.phase;
+    const cycle = (t*0.4 + ph) % 1; // 0..1 en bucle, sube y se apaga
+    e.position.y = e.userData.baseY + cycle*0.9;
+    e.position.x = e.userData.baseX + Math.sin(t*3 + ph*10)*0.05;
+    e.material.opacity = 1 - cycle;
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  updateCameraPosition();
+  if (selectionGroup.visible) {
+    arrowMesh.position.y = 2.3 + Math.sin(t*5)*0.15;
+    ringMesh.rotation.z  = t * 1.5;
+  }
+  animateBurntGlow(t);
+  animateFire(t);
+  renderer.render(scene, camera);
+}
+animate();
+
+// ─── CARGA + REFRESCO INCREMENTAL (sin location.reload) ─────────────────────
+// Antes la página completa se recargaba cada 5 min (perdía el scroll de
+// cámara, recargaba three.js de nuevo, y ante cualquier falla de red mostraba
+// datos sintéticos como si fueran reales). Ahora: se reintenta en el mismo
+// documento, se conserva la última data válida ante una falla transitoria, y
+// el modo demo sólo se muestra si NUNCA hubo datos reales.
+let lastGoodRows = null;
+let hasLoadedOnce = false;
+let lastRenderedRows = null;      // última data efectivamente pintada (para
+let lastRenderedIsSynth = true;   // poder re-renderizar al togglear el fuego
+                                   // sin volver a pedir datos a Grid)
+
+function setConnBanner(mode) {
+  document.getElementById('banner-conn').classList.toggle('show', mode === 'stale');
+  document.getElementById('banner-demo').classList.toggle('show', mode === 'demo');
+}
+
+function render(rows, isSynth, maxUpdatedAt) {
+  lastRenderedRows = rows;
+  lastRenderedIsSynth = isSynth;
+  const built = buildLayoutWithData(isSynth ? null : rows);
+  buildScene(built.layout);
+  updateUI(allPallets, built.isSynth, built.maxUpdatedAt);
+}
+
+async function refreshData(isInitial) {
+  const ldot = document.getElementById('ldot');
+  ldot.classList.add('loading');
+  try {
+    const rows = await loadDataset(STAGE_DATASET_NAME);
+    if (rows && rows.length) {
+      lastGoodRows = rows;
+      hasLoadedOnce = true;
+      setConnBanner('none');
+      render(rows, false);
+    } else if (!hasLoadedOnce) {
+      render(null, true);
+      setConnBanner('demo');
+    } else {
+      setConnBanner('stale'); // sin filas nuevas, se mantiene lo último renderizado
+    }
+    ldot.classList.remove('loading','error');
+  } catch (e) {
+    console.warn('[Stage] Error al leer stage_data desde Grid:', e && e.message ? e.message : e);
+    ldot.classList.remove('loading'); ldot.classList.add('error');
+    if (lastGoodRows) {
+      setConnBanner('stale');
+    } else if (!hasLoadedOnce) {
+      render(null, true);
+      setConnBanner('demo');
+    }
+  }
+}
+
+async function init() {
+  document.getElementById('loading-overlay').style.display = 'flex';
+  await refreshData(true);
+  document.getElementById('loading-overlay').style.display = 'none';
+  setInterval(() => refreshData(false), REFRESH_INTERVAL_MS);
+  vInit(); // no bloquea el resto si falla
+}
+
+init();
+</script>
+
+
+
+
+</body>
+</html>

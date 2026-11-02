@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Layout 3D — Packing & Conveyors 1 a 6</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060810;color:#dde2ee;font-family:system-ui,-apple-system,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+
+/* Topbar y Navegación */
+.topbar{padding:8px 16px;background:#0b0f19;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:12px;z-index:30;flex-shrink:0;flex-wrap:wrap}
+.ztitle{font-size:.85rem;font-weight:800;color:#f59e0b;letter-spacing:.06em;text-transform:uppercase;margin-right:10px}
+
+.nav-group{display:flex;gap:6px;align-items:center}
+.btn-conv{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:5px 12px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s ease}
+.btn-conv:hover{background:#0284c7;border-color:#38bdf8;color:#fff;transform:translateY(-1px)}
+.btn-conv.active{background:#f59e0b;border-color:#fbbf24;color:#0f172a;box-shadow:0 0 10px rgba(245,158,11,.4)}
+.btn-gen{background:#0284c7;border-color:#38bdf8;color:#fff}
+
+.legend{display:flex;gap:14px;margin-left:auto;align-items:center;font-size:.7rem;color:#94a3b8}
+.leg{display:flex;align-items:center;gap:5px}
+.ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+.main{flex:1;position:relative;overflow:hidden}
+#c{width:100%;height:100%;display:block;cursor:grab}
+#c:active{cursor:grabbing}
+
+.clabel{position:absolute;pointer-events:none;font-size:.68rem;font-weight:800;color:#f8fafc;
+  background:rgba(15,23,42,.92);padding:4px 10px;border-radius:4px;
+  border:1px solid #38bdf8;box-shadow:0 4px 12px rgba(0,0,0,.5);white-space:nowrap;transform:translate(-50%,-100%)}
+
+.popup{position:fixed;width:290px;background:rgba(11,15,25,.96);backdrop-filter:blur(12px);
+  border:1px solid #0ea5e9;border-radius:8px;z-index:300;padding:14px;
+  font-size:.75rem;display:none;box-shadow:0 12px 32px rgba(0,0,0,.8)}
+.pcls{position:absolute;top:8px;right:12px;cursor:pointer;color:#64748b;font-size:1.1rem}
+.pcls:hover{color:#fff}
+.ptitle{font-weight:800;font-size:.9rem;color:#fff;margin-bottom:6px;padding-right:16px;line-height:1.3}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:12px;font-size:.68rem;font-weight:700;margin-bottom:8px;background:rgba(34,197,94,.15);color:#4ade80;border:1px solid #22c55e}
+.prow{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1e293b;color:#94a3b8}
+.prow b{color:#f1f5f9;font-family:monospace;font-size:.72rem}
+
+/* Panel lateral de operarios */
+#sidebar{position:fixed;top:0;right:0;width:260px;height:100vh;background:rgba(7,10,20,.97);
+  border-left:1px solid #1e293b;z-index:200;display:flex;flex-direction:column;overflow:hidden;
+  transition:transform .3s ease}
+#sidebar.collapsed{transform:translateX(248px)}
+.sb-header{padding:10px 14px;background:#0b0f19;border-bottom:1px solid #1e293b;flex-shrink:0;
+  display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.sb-toggle{font-size:1rem;color:#94a3b8;flex-shrink:0;transition:transform .3s ease;margin-top:1px}
+#sidebar.collapsed .sb-toggle{transform:rotate(180deg)}
+.sb-texts{flex:1;min-width:0}
+.sb-title{font-size:.75rem;font-weight:800;color:#f59e0b;letter-spacing:.05em;text-transform:uppercase}
+.sb-count{font-size:.68rem;color:#94a3b8;margin-top:2px}
+.sb-refresh{font-size:.65rem;color:#64748b;margin-top:1px}
+#sb-list{flex:1;overflow-y:auto;padding:6px}
+#sb-list::-webkit-scrollbar{width:4px}
+#sb-list::-webkit-scrollbar-track{background:#0b0f19}
+#sb-list::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+.rep-card{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:4px;
+  border-radius:6px;cursor:pointer;border:1px solid #1e293b;background:#0f172a;
+  transition:background .15s,border-color .15s}
+.rep-card:hover{background:#1e293b;border-color:#38bdf8}
+.rep-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rep-info{flex:1;min-width:0}
+.rep-name{font-size:.74rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rep-detail{font-size:.64rem;color:#94a3b8;margin-top:1px}
+.rep-time{font-size:.62rem;font-weight:700;flex-shrink:0;text-align:right}
+
+/* Label flotante del rep seleccionado */
+#sel-label{position:absolute;pointer-events:none;display:none;
+  transform:translate(-50%,-100%);text-align:center;z-index:100}
+.sel-arrow{font-size:1.6rem;color:#22c55e;line-height:1;
+  animation:selbounce .5s ease-in-out infinite alternate;display:block}
+.sel-name{background:rgba(34,197,94,.18);border:1px solid #22c55e;color:#22c55e;
+  font-size:.72rem;font-weight:800;padding:4px 10px;border-radius:5px;
+  white-space:nowrap;box-shadow:0 0 12px rgba(34,197,94,.4)}
+@keyframes selbounce{from{transform:translateY(0)}to{transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="ztitle">🏬 LAYOUT 3D — PACKING & CONVEYORS</span>
+
+  <div class="nav-group">
+    <button class="btn-conv btn-gen active" onclick="selectView(-1, this)">🌐 Vista General</button>
+    <button class="btn-conv" onclick="selectView(0, this)">Conveyor 1</button>
+    <button class="btn-conv" onclick="selectView(1, this)">Conveyor 2</button>
+    <button class="btn-conv" onclick="selectView(2, this)">Conveyor 3</button>
+    <button class="btn-conv" onclick="selectView(3, this)">Conveyor 4</button>
+    <button class="btn-conv" onclick="selectView(4, this)">Conveyor 5</button>
+    <button class="btn-conv" onclick="selectView(5, this)">Conveyor 6</button>
+  </div>
+
+  <div class="legend">
+    <div class="leg"><div class="ldot" style="background:#facc15"></div>Operario Amarillo (En Producción)</div>
+    <div class="leg"><div class="ldot" style="background:#0ea5e9"></div>Modo Cámara Fija Lateral (Arrastra Izq/Der)</div>
+  </div>
+</div>
+
+<div class="main" id="main">
+  <canvas id="c"></canvas>
+  <div id="sel-label">
+    <span class="sel-arrow">▼</span>
+    <span class="sel-name" id="sel-name"></span>
+  </div>
+</div>
+
+<div id="sidebar">
+  <div class="sb-header" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">
+    <span class="sb-toggle">◀</span>
+    <div class="sb-texts">
+      <div class="sb-title">👷 OPERARIOS EN PACKING</div>
+      <div class="sb-count" id="sb-count">Cargando…</div>
+      <div class="sb-refresh" id="sb-refresh"></div>
+    </div>
+  </div>
+  <div id="sb-list"></div>
+</div>
+
+<div class="popup" id="popup">
+  <span class="pcls" onclick="closePopup()">✕</span>
+  <div class="ptitle" id="ptitle"></div>
+  <div id="pbody"></div>
+</div>
+
+<script>
+function range(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i);return r;}
+function pad2(n){return String(n).padStart(2,'0');}
+
+function banca(nums){
+  const out=[];
+  nums.forEach(n=>{
+    const p=pad2(n);
+    out.push({id:p+'-A',type:'n',side:'A',bn:p});
+    out.push({id:p+'-B',type:'n',side:'B',bn:p});
+  });
+  return out;
+}
+
+function mono(nums){
+  return nums.map(n=>({
+    id:'M'+pad2(n), type:'mono',
+    label:'Puesto '+pad2(n)+' · Mono',
+    wt:'WT-0-000-001-00-'+pad2(n)
+  }));
+}
+
+function pm(i){
+  return {id:'PM'+i, type:'pm',
+    label:'Bancada '+i+' · Packing Machine',
+    wt:'WT-0-000-001-00-0'+i};
+}
+
+const LAYOUT=[
+  {id:'C1', label:'Conveyor 1', x:115,
+   left:  banca([70,71,72, ...range(12,19)]),
+   right: banca(range(1,11))
+  },
+  {id:'C2', label:'Conveyor 2', x:92,
+   left:  banca(range(32,42)),
+   right: banca(range(20,31))
+  },
+  {id:'C3', label:'Conveyor 3', x:69,
+   left:  banca(range(52,60)),
+   right: banca(range(43,51))
+  },
+  {id:'C4', label:'Conveyor 4', x:46,
+   left:  [pm(1),pm(2),pm(3),pm(4), ...mono([83,...range(5,13)])],
+   right: banca(range(61,69))
+  },
+  {id:'C5', label:'Conveyor 5', x:23,
+   left:  mono([...range(31,44), 79]),
+   right: mono(range(14,30))
+  },
+  {id:'C6', label:'Conveyor 6', x:0,
+   left:  mono([...range(1,13), 31,69,60]),
+   right: mono([...range(45,59), 77,78,81])
+  }
+];
+
+// THREE.JS SETUP
+const canvas=document.getElementById('c');
+const tbH=document.querySelector('.topbar').offsetHeight;
+const W=window.innerWidth, H=window.innerHeight-tbH;
+
+const renderer=new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(W, H);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x060810);
+scene.fog=new THREE.FogExp2(0x060810, 0.003);
+
+const camera=new THREE.PerspectiveCamera(38, W/H, 0.1, 700);
+
+// ILUMINACIÓN
+scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.2);
+dirLight.position.set(60, 80, -30);
+scene.add(dirLight);
+
+// MATERIALES OPERARIO
+const MAT_YELLOW = new THREE.MeshStandardMaterial({color: 0xfacc15, roughness: 0.3, metalness: 0.1});
+const MAT_YELLOW_CAP = new THREE.MeshStandardMaterial({color: 0xeab308, roughness: 0.2});
+const MAT_DARK_PANTS = new THREE.MeshStandardMaterial({color: 0x0f172a, roughness: 0.8});
+const MAT_SHOES = new THREE.MeshStandardMaterial({color: 0x0284c7, roughness: 0.4});
+
+// MATERIALES ESTRUCTURA
+const MAT={
+  steelDark:  new THREE.MeshStandardMaterial({color: 0x1e293b, roughness: 0.3, metalness: 0.8}),
+  tableTop:   new THREE.MeshStandardMaterial({color: 0xf8fafc, roughness: 0.1}),
+  tableEdge:  new THREE.MeshStandardMaterial({color: 0x0284c7, roughness: 0.3}),
+  yellowBin:  new THREE.MeshStandardMaterial({color: 0xfacc15, roughness: 0.2}),
+  yellowRail: new THREE.MeshStandardMaterial({color: 0xeab308, roughness: 0.2}),
+  cardboard:  new THREE.MeshStandardMaterial({color: 0xc2410c, roughness: 0.8}),
+  beltBed:    new THREE.MeshStandardMaterial({color: 0x0f172a, roughness: 0.6}),
+  polybag:    new THREE.MeshStandardMaterial({color: 0xfde047, roughness: 0.4}),
+  floor:      new THREE.MeshStandardMaterial({color: 0x080c16, roughness: 0.8}),
+  matRubber:  new THREE.MeshStandardMaterial({color: 0x111827, roughness: 0.9}),
+  lightActive:new THREE.MeshStandardMaterial({color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.8})
+};
+
+const animatedWorkers = [];
+const interactables = [];
+const labelMeta = [];
+const stationRefs = {}; // ← NUEVO: key "bn-side" → {ledStrip, hitBox}
+
+// OPERARIO AMARILLO ANIMADO
+function createDancingYellowWorker(isA) {
+  const worker = new THREE.Group();
+
+  const sL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.32), MAT_SHOES);
+  sL.position.set(-0.16, 0.06, 0.04); worker.add(sL);
+  const sR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.32), MAT_SHOES);
+  sR.position.set(0.16, 0.06, 0.04); worker.add(sR);
+
+  const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.85, 12), MAT_DARK_PANTS);
+  legs.position.y = 0.5; worker.add(legs);
+
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 0.7, 12), MAT_YELLOW);
+  torso.position.y = 1.2; worker.add(torso);
+
+  const headGroup = new THREE.Group();
+  headGroup.position.y = 1.7;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 16), MAT_YELLOW);
+  headGroup.add(head);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 16), MAT_YELLOW_CAP);
+  cap.position.y = 0.1; headGroup.add(cap);
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.02, 0.16), MAT_YELLOW_CAP);
+  visor.position.set(0, 0.08, 0.14); headGroup.add(visor);
+  worker.add(headGroup);
+
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.55, 8), MAT_YELLOW);
+  armL.position.set(-0.32, 1.25, 0); armL.geometry.translate(0, -0.25, 0); worker.add(armL);
+
+  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.55, 8), MAT_YELLOW);
+  armR.position.set(0.32, 1.25, 0); armR.geometry.translate(0, -0.25, 0); worker.add(armR);
+
+  return { group: worker, head: headGroup, armL, armR, baseY: 0.02, baseRotY: isA ? 0 : Math.PI };
+}
+
+// BANCADA DE TRABAJO
+function createPutWallStation(st, workerIdx) {
+  const group = new THREE.Group();
+  const isA = st.side === 'A' || st.type === 'mono';
+  const width = 2.3, height = 2.4;
+
+  const floorMat = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.02, 1.4), MAT.matRubber);
+  floorMat.position.set(0, 0.01, isA ? -1.1 : 1.1); group.add(floorMat);
+
+  const table = new THREE.Mesh(new THREE.BoxGeometry(width, 0.1, 0.95), MAT.tableTop);
+  table.position.set(0, 0.88, isA ? -0.4 : 0.4); group.add(table);
+
+  const tableEdge = new THREE.Mesh(new THREE.BoxGeometry(width + 0.06, 0.05, 1.01), MAT.tableEdge);
+  tableEdge.position.set(0, 0.85, isA ? -0.4 : 0.4); group.add(tableEdge);
+
+  [[-width/2 + 0.1, isA ? -0.75 : 0.05], [width/2 - 0.1, isA ? -0.75 : 0.05],
+   [-width/2 + 0.1, isA ? -0.05 : 0.75], [width/2 - 0.1, isA ? -0.05 : 0.75]].forEach(p => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 12), MAT.steelDark);
+    leg.position.set(p[0], 0.425, p[1]); group.add(leg);
+  });
+
+  const archL = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, height, 12), MAT.steelDark);
+  archL.position.set(-width/2 + 0.06, height/2, 0); group.add(archL);
+  const archR = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, height, 12), MAT.steelDark);
+  archR.position.set(width/2 - 0.06, height/2, 0); group.add(archR);
+
+  const topBeam = new THREE.Mesh(new THREE.BoxGeometry(width, 0.08, 0.08), MAT.steelDark);
+  topBeam.position.set(0, height, 0); group.add(topBeam);
+
+  const ledStrip = new THREE.Mesh(new THREE.BoxGeometry(width - 0.2, 0.04, 0.08), MAT.lightActive);
+  ledStrip.position.set(0, height - 0.05, 0); group.add(ledStrip);
+
+  for (let level = 0; level < 3; level++) {
+    const shelfY = 1.15 + (level * 0.36);
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(width - 0.1, 0.03, 0.55), MAT.steelDark);
+    shelf.position.set(0, shelfY, 0); group.add(shelf);
+
+    [-0.85, -0.51, -0.17, 0.17, 0.51, 0.85].forEach(cx => {
+      const bin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.42), MAT.yellowBin);
+      bin.position.set(cx, shelfY + 0.14, isA ? 0.05 : -0.05); group.add(bin);
+    });
+  }
+
+  const screen = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.3, 0.02), new THREE.MeshBasicMaterial({color:0x0284c7}));
+  screen.position.set(0.55, 1.18, isA ? -0.45 : 0.45);
+  screen.rotation.y = isA ? 0.25 : -0.25; group.add(screen);
+
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.32, 0.4), MAT.cardboard);
+  box.position.set(-0.25, 1.05, isA ? -0.38 : 0.38); group.add(box);
+
+  const workerObj = createDancingYellowWorker(isA);
+  workerObj.group.position.set(0, workerObj.baseY, isA ? -1.1 : 1.1);
+  workerObj.group.rotation.y = workerObj.baseRotY;
+  workerObj.phaseShift = workerIdx * 0.4;
+  group.add(workerObj.group);
+  animatedWorkers.push(workerObj);
+
+  const hitBox = new THREE.Mesh(new THREE.BoxGeometry(width + 0.2, height + 0.2, 1.8), new THREE.MeshBasicMaterial({visible: false}));
+  hitBox.position.set(0, height/2, 0);
+  hitBox.userData = {...st, active: true, packer: null};
+  group.add(hitBox);
+  interactables.push(hitBox);
+
+  // ← NUEVO: guardar refs para actualizar con data Grid
+  if (st.bn) stationRefs[st.bn + '-' + st.side] = { ledStrip, hitBox, worker: workerObj };
+
+  return group;
+}
+
+// CORREA TRANSPORTADORA COMPACTA
+function createConveyorLine(x, length) {
+  const group = new THREE.Group();
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, length), MAT.beltBed);
+  belt.position.set(x, 0.8, length / 2); group.add(belt);
+
+  const railGeo = new THREE.BoxGeometry(0.06, 0.25, length);
+  const leftRail = new THREE.Mesh(railGeo, MAT.yellowRail); leftRail.position.set(x - 0.48, 0.92, length / 2);
+  const rightRail = new THREE.Mesh(railGeo, MAT.yellowRail); rightRail.position.set(x + 0.48, 0.92, length / 2);
+  group.add(leftRail); group.add(rightRail);
+
+  const legGeo = new THREE.BoxGeometry(0.08, 0.8, 0.08);
+  for (let z = 1.8; z < length; z += 4.5) {
+    const legL = new THREE.Mesh(legGeo, MAT.steelDark); legL.position.set(x - 0.42, 0.4, z);
+    const legR = new THREE.Mesh(legGeo, MAT.steelDark); legR.position.set(x + 0.42, 0.4, z);
+    group.add(legL); group.add(legR);
+  }
+
+  for (let z = 2; z < length - 1; z += 3.8) {
+    const isBag = Math.random() > 0.4;
+    const pkg = new THREE.Mesh(
+      isBag ? new THREE.BoxGeometry(0.38, 0.09, 0.48) : new THREE.BoxGeometry(0.35, 0.24, 0.38),
+      isBag ? MAT.polybag : MAT.cardboard
+    );
+    pkg.position.set(x + (Math.random()*0.2 - 0.1), 0.88, z);
+    pkg.rotation.y = Math.random() * 0.5; group.add(pkg);
+  }
+  return group;
+}
+
+// ESCENA GENERAL
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(260, 160), MAT.floor);
+floor.rotation.x = -Math.PI / 2; floor.position.set(55, 0, 30);
+scene.add(floor);
+
+let workerCounter = 0;
+LAYOUT.forEach(conv => {
+  const cx = conv.x;
+  let maxZ = 0;
+
+  ['left', 'right'].forEach(side => {
+    const isLeft = side === 'left';
+    let curZ = 1.5;
+
+    conv[side].forEach((st) => {
+      const zOffset = isLeft ? curZ : curZ + 0.5;
+      const wx = cx + (isLeft ? -2.75 : 2.75);
+      const stObj = createPutWallStation(st, workerCounter++);
+      stObj.position.set(wx, 0, zOffset);
+      scene.add(stObj);
+      // Guardar posición mundo para navegación del sidebar
+      if (st.bn) {
+        const key = st.bn + '-' + st.side;
+        if (stationRefs[key]) stationRefs[key].worldPos = {x: wx, y: 3, z: zOffset};
+      }
+      curZ += 3.5;
+    });
+    if (curZ > maxZ) maxZ = curZ;
+  });
+
+  const bLen = maxZ + 1.2;
+  scene.add(createConveyorLine(cx, bLen));
+
+  const el = document.createElement('div');
+  el.className = 'clabel'; el.textContent = conv.label;
+  document.getElementById('main').appendChild(el);
+  labelMeta.push({ el, pos: new THREE.Vector3(cx, 2.8, bLen / 2) });
+});
+
+// CONTROL DE CÁMARA Y DESPLAZAMIENTO LATERAL FIJO
+let activeView = -1;
+let currentCamPos = new THREE.Vector3(55, 65, 115);
+let targetCamPos  = new THREE.Vector3(55, 65, 115);
+let currentLookAt = new THREE.Vector3(55, 0, 18);
+let targetLookAt  = new THREE.Vector3(55, 0, 18);
+
+camera.position.copy(currentCamPos);
+camera.lookAt(currentLookAt);
+
+function selectView(index, btnEl) {
+  document.querySelectorAll('.btn-conv').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+
+  activeView = index;
+
+  if (index === -1) {
+    targetCamPos.set(55, 65, 115);
+    targetLookAt.set(55, 0, 18);
+  } else {
+    const conv = LAYOUT[index];
+    const cx = conv.x;
+    const startZ = 18;
+    targetCamPos.set(cx + 25, 6, startZ);
+    targetLookAt.set(cx, 6, startZ);
+  }
+}
+
+let isMouseDown = false, px = 0, py = 0;
+canvas.addEventListener('mousedown', e => { isMouseDown = true; px = e.clientX; py = e.clientY; });
+window.addEventListener('mouseup', () => isMouseDown = false);
+
+window.addEventListener('mousemove', e => {
+  if (!isMouseDown) return;
+  const dx = e.clientX - px, dy = e.clientY - py;
+  px = e.clientX; py = e.clientY;
+
+  if (activeView !== -1) {
+    const conv = LAYOUT[activeView];
+    const cx = conv.x;
+    const moveZ = (dx * 0.08) - (dy * 0.04);
+    targetCamPos.z = Math.max(-2, Math.min(42, targetCamPos.z + moveZ));
+    targetCamPos.x = cx + 25;
+    targetCamPos.y = 6;
+    targetLookAt.z = targetCamPos.z;
+    targetLookAt.x = cx;
+    targetLookAt.y = 6;
+  } else {
+    if (e.buttons === 1) {
+      targetCamPos.x -= dx * 0.12;
+      targetCamPos.y = Math.max(4, targetCamPos.y + dy * 0.1);
+    } else if (e.buttons === 2) {
+      targetCamPos.z += dy * 0.15;
+      targetLookAt.z += dy * 0.15;
+    }
+  }
+});
+
+canvas.addEventListener('wheel', e => {
+  if (activeView !== -1) {
+    const moveZ = e.deltaY * 0.03;
+    targetCamPos.z = Math.max(-2, Math.min(42, targetCamPos.z + moveZ));
+    targetLookAt.z = targetCamPos.z;
+  } else {
+    targetCamPos.z += e.deltaY * 0.05;
+  }
+  e.preventDefault();
+}, {passive: false});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// INTERACCIÓN Y POPUP
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactables);
+  if (!hits.length) { closePopup(); return; }
+
+  const st = hits[0].object.userData;
+  document.getElementById('ptitle').textContent = st.label || ('Bancada ' + st.bn + ' — Lado ' + st.side);
+
+  const p = st.packer;
+  if (p) {
+    // ← NUEVO: mostrar data real de Grid
+    const ec = {'ACTIVO':'#22c55e','LENTO':'#facc15','PARADO':'#f97316','SIN MOVIMIENTO':'#ef4444'};
+    const col = ec[p.ESTADO_REP] || '#38bdf8';
+    document.getElementById('pbody').innerHTML = `
+      <div class="status-badge" style="background:${col}22;color:${col};border:1px solid ${col}">● ${p.ESTADO_REP||'ACTIVO'}</div>
+      <div class="prow"><span>Operario</span><b>${p.NOMBRE||p.LDAP||'-'}</b></div>
+      <div class="prow"><span>LDAP</span><b>${p.LDAP||'-'}</b></div>
+      <div class="prow"><span>Bancada</span><b>${p.BANCADA||'-'}</b></div>
+      <div class="prow"><span>Último mov</span><b>${p.MIN_DESDE_ULTIMO_MOV} min</b></div>
+      ${p.TPH_ULTIMA_HORA!=null?`<div class="prow"><span>TPH 1h</span><b>${p.TPH_ULTIMA_HORA}</b></div>`:''}
+      ${p.UNIDADES_1H!=null?`<div class="prow"><span>Unidades 1h</span><b>${p.UNIDADES_1H}</b></div>`:''}
+      ${p.SEMAFORO_CPT?`<div class="prow"><span>CPT</span><b>${p.SEMAFORO_CPT}</b></div>`:''}
+    `;
+  } else {
+    document.getElementById('pbody').innerHTML = `
+      <div class="status-badge">🟡 OPERARIO AMARILLO (PRODUCIENDO)</div>
+      <div class="prow"><span>ID Puesto</span><b>${st.id}</b></div>
+      <div class="prow"><span>Estado</span><b>100% OPERATIVO</b></div>
+      <div class="prow"><span>Faja</span><b>${st.wt || 'Conveyor Standard'}</b></div>
+    `;
+  }
+
+  const pop = document.getElementById('popup');
+  pop.style.display = 'block';
+  pop.style.left = Math.min(e.clientX + 12, window.innerWidth - 310) + 'px';
+  pop.style.top = Math.min(e.clientY - 12, window.innerHeight - 200) + 'px';
+});
+
+function closePopup() { document.getElementById('popup').style.display = 'none'; }
+
+// Posición 3D del rep seleccionado para el label flotante
+let selLabelWorld = null;
+
+// Navega cámara a la bancada del operario — SIN popup (popup solo al hacer click en 3D)
+function focusRep(key) {
+  const refs = stationRefs[key];
+  if (!refs || !refs.worldPos) return;
+  closePopup();
+  activeView = -2;
+  const wp = refs.worldPos;
+  targetCamPos.set(wp.x + 14, 7, wp.z);
+  targetLookAt.set(wp.x, 3, wp.z);
+
+  // Mostrar flecha verde flotante encima del worker
+  const p = refs.hitBox.userData.packer;
+  const nombre = (p && (p.NOMBRE || p.LDAP)) || key;
+  document.getElementById('sel-name').textContent = nombre;
+  document.getElementById('sel-label').style.display = 'block';
+  selLabelWorld = new THREE.Vector3(wp.x, wp.y + 2.5, wp.z);
+}
+
+// Rellena el panel lateral con la lista de operarios
+function populateSidebar(arr) {
+  const ec = {'ACTIVO':'#22c55e','LENTO':'#facc15','PARADO':'#f97316','SIN MOVIMIENTO':'#ef4444'};
+  const ordered = [...arr].sort((a,b) => (a.MIN_DESDE_ULTIMO_MOV||0) - (b.MIN_DESDE_ULTIMO_MOV||0));
+
+  document.getElementById('sb-count').textContent =
+    arr.length + ' operarios · ' +
+    (arr.filter(p=>p.ESTADO_REP==='ACTIVO').length) + ' activos · ' +
+    (arr.filter(p=>p.ESTADO_REP==='LENTO').length) + ' lentos · ' +
+    (arr.filter(p=>p.ESTADO_REP==='PARADO'||p.ESTADO_REP==='SIN MOVIMIENTO').length) + ' parados';
+
+  document.getElementById('sb-refresh').textContent =
+    'Actualizado: ' + new Date().toLocaleTimeString('es-CL');
+
+  const list = document.getElementById('sb-list');
+  list.innerHTML = '';
+
+  ordered.forEach(p => {
+    const parts = (p.BANCADA||'').split('-');
+    let key = '';
+    if (parts.length >= 5 && parts[0]==='PW') {
+      const bn = String(parseInt(parts[3]||'0')).padStart(2,'0');
+      const pos = parseInt(parts[4]||'1');
+      key = bn + '-' + (pos <= 3 ? 'A' : 'B');
+    }
+    const col = ec[p.ESTADO_REP] || '#38bdf8';
+    const safeP = JSON.stringify(p).replace(/"/g,'&quot;');
+    const card = document.createElement('div');
+    card.className = 'rep-card';
+    card.onclick = () => focusRep(key);
+    card.innerHTML = `
+      <div class="rep-dot" style="background:${col};box-shadow:0 0 6px ${col}"></div>
+      <div class="rep-info">
+        <div class="rep-name">${p.NOMBRE||p.LDAP||'-'}</div>
+        <div class="rep-detail">${p.BANCADA||'-'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">
+        <div class="rep-time" style="color:${col}">${p.MIN_DESDE_ULTIMO_MOV} min</div>
+        <div style="font-size:.8rem;color:#38bdf8">↑</div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ← NUEVO: materiales por estado y carga de data Grid
+const LED_ESTADO = {
+  'ACTIVO':         new THREE.MeshStandardMaterial({color:0x4ade80, emissive:0x22c55e, emissiveIntensity:0.8}),
+  'LENTO':          new THREE.MeshStandardMaterial({color:0xfde047, emissive:0xca8a04, emissiveIntensity:0.8}),
+  'PARADO':         new THREE.MeshStandardMaterial({color:0xfb923c, emissive:0xc2410c, emissiveIntensity:0.8}),
+  'SIN MOVIMIENTO': new THREE.MeshStandardMaterial({color:0xf87171, emissive:0xef4444, emissiveIntensity:0.8}),
+};
+
+async function loadPackingData() {
+  try {
+    // 1. Obtener metadata del dataset
+    const metaRes = await fetch(
+      '/api/v1/documents/YOUR_DOCUMENT_ID/datasets/reps_packing',
+      {credentials: 'include'}
+    );
+    const meta = await metaRes.json();
+    console.log('[Packing] meta:', JSON.stringify(meta).slice(0, 300));
+
+    if (!meta.download_url) { console.warn('[Packing] download_url vacío'); return; }
+
+    // 2. Fetch del download_url SIN credentials (es URL pre-firmada S3/GCS)
+    const rawRes = await fetch(meta.download_url);
+    const raw = await rawRes.json();
+    const arr = Array.isArray(raw) ? raw : (raw.data || raw.rows || []);
+    console.log('[Packing] rows:', arr.length, '— ejemplo BANCADA:', arr[0] && arr[0].BANCADA);
+    console.log('[Packing] stationRefs keys:', Object.keys(stationRefs).slice(0,10));
+
+    // 3. Mapear cada fila a su estación
+    let matched = 0;
+    arr.forEach(p => {
+      if (!p.BANCADA) return;
+      const parts = p.BANCADA.split('-');
+      // Formato esperado: PW-X-XXX-NNN-PP-ZZ
+      // Intentar con parts[3] (formato largo) o parts[1] (formato corto)
+      let bn, side;
+      if (parts.length >= 5 && parts[0] === 'PW') {
+        bn   = String(parseInt(parts[3]||'0')).padStart(2,'0');
+        const pos = parseInt(parts[4]||'1');
+        side = pos <= 3 ? 'A' : 'B';
+      } else {
+        console.warn('[Packing] BANCADA formato inesperado:', p.BANCADA);
+        return;
+      }
+      const key = bn + '-' + side;
+      const refs = stationRefs[key];
+      if (!refs) { console.warn('[Packing] sin refs para key:', key, '— bancada:', p.BANCADA); return; }
+      refs.hitBox.userData.packer = p;
+      const mat = LED_ESTADO[p.ESTADO_REP];
+      if (mat) refs.ledStrip.material = mat;
+      // Controlar animación del worker según estado
+      if (refs.worker) {
+        refs.worker.dancing = (p.ESTADO_REP === 'ACTIVO' || p.ESTADO_REP === 'LENTO');
+      }
+      matched++;
+    });
+    console.log('[Packing] operarios mapeados:', matched, '/', arr.length);
+    populateSidebar(arr);
+  } catch(e) { console.error('[Packing] error:', e); }
+}
+
+loadPackingData();
+setInterval(loadPackingData, 10 * 60 * 1000);
+
+// ANIMACIÓN
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const elapsed = clock.getElapsedTime();
+
+  animatedWorkers.forEach(w => {
+    if (w.dancing === false) return; // quieto si está parado/sin movimiento
+    const t = elapsed * 4.5 + w.phaseShift;
+    w.group.position.y = w.baseY + Math.abs(Math.sin(t)) * 0.08;
+    w.group.rotation.y = w.baseRotY + Math.sin(t * 0.6) * 0.18;
+    w.armL.rotation.x = -0.4 + Math.sin(t * 1.5) * 0.35;
+    w.armR.rotation.x = -0.4 - Math.sin(t * 1.5) * 0.35;
+    w.head.rotation.z = Math.sin(t * 0.8) * 0.08;
+  });
+
+  currentCamPos.lerp(targetCamPos, 0.08);
+  currentLookAt.lerp(targetLookAt, 0.08);
+  camera.position.copy(currentCamPos);
+  camera.lookAt(currentLookAt);
+
+  renderer.render(scene, camera);
+
+  const cW = renderer.domElement.clientWidth, cH = renderer.domElement.clientHeight;
+  const tmpV = new THREE.Vector3();
+  labelMeta.forEach(({el, pos}) => {
+    tmpV.copy(pos).project(camera);
+    if (tmpV.z > 1) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.style.left = ((tmpV.x * 0.5 + 0.5) * cW) + 'px';
+    el.style.top = ((tmpV.y * -0.5 + 0.5) * cH) + 'px';
+  });
+
+  // Label flotante del rep seleccionado
+  if (selLabelWorld) {
+    tmpV.copy(selLabelWorld).project(camera);
+    const sl = document.getElementById('sel-label');
+    if (tmpV.z > 1) { sl.style.display = 'none'; }
+    else {
+      sl.style.display = 'block';
+      sl.style.left = ((tmpV.x * 0.5 + 0.5) * cW) + 'px';
+      sl.style.top  = ((tmpV.y * -0.5 + 0.5) * cH) + 'px';
+    }
+  }
+}
+
+animate();
+
+window.addEventListener('resize', () => {
+  const nW = window.innerWidth, nH = window.innerHeight - tbH;
+  renderer.setSize(nW, nH);
+  camera.aspect = nW / nH;
+  camera.updateProjectionMatrix();
+});
+</script>
+
+
+
+
+
+
+</body>
+</html>

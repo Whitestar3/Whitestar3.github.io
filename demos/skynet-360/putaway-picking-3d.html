@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Putaway 3D — CD-01</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080e;--surface:#0d0f1b;--card:#121526;--border:#1e243d;
+  --green:#27ae60;--yellow:#f1c40f;--red:#e74c3c;--burnt:#8e44ad;--cyan:#00f3ff;
+  --txt:#dde2ee;--sub:#5d6d8a;--accent:#f39c12;--orange:#ff6600;
+}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+.topbar{display:flex;align-items:center;gap:10px;padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:30}
+.sep{width:1px;height:16px;background:var(--border)}
+.zone-title{font-size:.88rem;font-weight:800;color:var(--accent);letter-spacing:.07em;text-transform:uppercase}
+.zone-sub{font-size:.6rem;color:var(--sub)}
+.topbar-kpis{display:flex;gap:12px;margin-left:auto;align-items:center}
+.tk{display:flex;align-items:center;gap:5px;font-size:.72rem}
+.tk-dot{width:8px;height:8px;border-radius:2px}
+.tk-v{font-weight:700}
+.live{display:flex;align-items:center;gap:6px;font-size:.65rem;color:var(--sub);background:rgba(255,255,255,.03);padding:3px 8px;border-radius:10px;border:1px solid var(--border)}
+.ldot{width:6px;height:6px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.floor-selector{display:flex;gap:5px;margin-left:10px}
+.floor-btn{background:var(--card);border:1px solid var(--border);color:var(--txt);padding:4px 11px;border-radius:4px;font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s}
+.floor-btn:hover{border-color:var(--yellow)}
+.floor-btn.active{background:var(--yellow);color:#000;border-color:var(--yellow)}
+.main-wrapper{flex:1;display:flex;min-height:0;position:relative;overflow:hidden}
+#three-canvas{width:100%;height:100%;display:block;cursor:grab}
+#three-canvas:active{cursor:grabbing}
+.nav-hint{position:absolute;bottom:14px;left:18px;background:rgba(13,15,27,.88);border:1px solid var(--border);padding:5px 12px;border-radius:20px;font-size:.62rem;color:var(--sub);pointer-events:none;z-index:10;backdrop-filter:blur(4px)}
+#labels-container{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:15}
+.street-label{position:absolute;transform:translate(-50%,-100%);color:#f1c40f;font-weight:900;font-size:12px;font-family:monospace;background:rgba(13,15,27,0.85);padding:2px 5px;border-radius:4px;border:1px solid rgba(241,196,15,0.4);white-space:nowrap}
+.street-label.has-rep{color:#00f3ff;border-color:rgba(0,243,255,0.5);background:rgba(0,20,40,0.9)}
+.sector-label{position:absolute;transform:translate(-50%,-100%);color:#f1c40f;font-weight:900;font-size:13px;font-family:sans-serif;background:rgba(13,15,27,0.9);padding:4px 12px;border-radius:6px;border:1px solid #f1c40f;white-space:nowrap;letter-spacing:1px}
+
+/* Panel Lateral */
+.panel{width:262px;flex-shrink:0;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;z-index:20}
+.panel-head{padding:9px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.panel-title{font-size:.73rem;font-weight:800;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.zone-cards{padding:8px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.zc{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px}
+.zc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.zc-name{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.zc-total{font-size:.62rem;color:var(--sub)}
+.zc-bars{display:flex;gap:4px}
+.zc-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.zc-bar-v{font-size:.72rem;font-weight:800;line-height:1}
+.zc-bar-l{font-size:.45rem;color:var(--sub);text-transform:uppercase}
+.zc.mz0 .zc-name{color:#3498db}
+.zc.gm .zc-name{color:var(--orange)}
+.zc.hv .zc-name{color:var(--yellow)}
+.panel-section-title{font-size:.62rem;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;padding:7px 12px 3px;border-top:1px solid var(--border);flex-shrink:0}
+.reps-list{flex:1;overflow-y:auto;padding:4px 8px}
+.rep-item{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 8px;margin-bottom:4px;cursor:pointer;transition:all .15s}
+.rep-item:hover{border-color:var(--cyan);background:#0d1a2a}
+.rep-item.active-rep{border-left:3px solid var(--cyan)}
+.ri-r1{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.ri-ldap{font-size:.66rem;font-weight:700;color:var(--txt)}
+.ri-pasillo{font-size:.56rem;font-family:monospace;background:rgba(0,243,255,.12);color:var(--cyan);padding:2px 5px;border-radius:3px}
+.ri-r2{font-size:.52rem;color:var(--sub)}
+
+#hover-tooltip{position:fixed;pointer-events:none;background:rgba(10,12,22,.97);border:1px solid var(--orange);padding:5px 10px;border-radius:6px;font-size:.65rem;color:var(--orange);font-weight:800;display:none;z-index:90;font-family:monospace}
+
+.popup-box{position:fixed;right:272px;bottom:18px;width:300px;background:rgba(10,13,26,.97);backdrop-filter:blur(18px);border-radius:10px;z-index:100;padding:14px;display:none}
+.pop-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.pop-title-txt{font-size:.86rem;font-weight:800;font-family:monospace}
+.pop-close-btn{background:none;border:none;cursor:pointer;color:var(--sub);font-size:1rem;line-height:1;padding:0}.pop-close-btn:hover{color:#fff}
+.pop-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a2138}
+.pop-lbl{color:var(--sub);font-size:.65rem}.pop-val{font-weight:600;color:var(--txt);text-align:right;font-size:.65rem;max-width:60%}
+.pop-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:800;font-size:.58rem;text-transform:uppercase}
+.pop-badge.burnt{background:rgba(142,68,173,.4);color:#e8daef}
+.pop-badge.red{background:rgba(231,76,60,.3);color:var(--red)}
+.pop-badge.yellow{background:rgba(241,196,15,.25);color:var(--yellow)}
+.pop-badge.green{background:rgba(39,174,96,.25);color:var(--green)}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(7,8,14,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:12px}
+.loading-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{font-size:.8rem;color:var(--sub)}
+.sla-btn{background:rgba(52,152,219,.15);border:1px solid #3498db;color:#3498db;padding:4px 10px;border-radius:4px;font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s}
+.sla-btn:hover{background:rgba(52,152,219,.3)}
+/* SLA MODAL */
+.sla-modal{position:fixed;top:50px;right:10px;width:440px;max-height:calc(100vh - 70px);background:rgba(10,13,26,.98);backdrop-filter:blur(18px);border:1px solid #3498db;border-radius:10px;z-index:150;display:none;flex-direction:column;box-shadow:0 0 30px rgba(52,152,219,.25)}
+.sla-modal.open{display:flex}
+.sla-modal-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sla-modal-title{font-size:.78rem;font-weight:800;color:#3498db;text-transform:uppercase;letter-spacing:.07em}
+.sla-modal-close{background:none;border:none;color:var(--sub);font-size:1rem;cursor:pointer}.sla-modal-close:hover{color:#fff}
+.sla-modal-stats{display:flex;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sla-stat{flex:1;background:var(--card);border-radius:5px;padding:5px 8px;text-align:center}
+.sla-stat-v{font-size:.95rem;font-weight:800}
+.sla-stat-l{font-size:.44rem;color:var(--sub);text-transform:uppercase}
+.sla-table{flex:1;overflow-y:auto;padding:6px}
+.sla-row{display:grid;grid-template-columns:70px 1fr auto auto;gap:6px;align-items:center;padding:5px 8px;border-radius:5px;margin-bottom:3px;background:var(--card);border:1px solid var(--border)}
+.sla-row:hover{border-color:#3498db}
+.sla-tote{font-size:.6rem;font-family:monospace;color:var(--txt);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sla-familia{font-size:.55rem;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sla-hrs{font-size:.7rem;font-weight:800;text-align:right}
+.sla-badge{font-size:.55rem;font-weight:800;padding:2px 5px;border-radius:3px;text-transform:uppercase;white-space:nowrap}
+.sla-badge.burnt{background:rgba(142,68,173,.4);color:#e8daef}
+.sla-badge.red{background:rgba(231,76,60,.3);color:var(--red)}
+.sla-badge.yellow{background:rgba(241,196,15,.25);color:var(--yellow)}
+.sla-badge.green{background:rgba(39,174,96,.25);color:var(--green)}
+
+/* Panel tabs REPS / SLA */
+.panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.ptab{flex:1;background:none;border:none;border-bottom:2px solid transparent;color:var(--sub);font-size:.68rem;font-weight:800;padding:8px 4px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;transition:all .15s}
+.ptab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.ptab:hover:not(.active){color:var(--txt)}
+.tab-content{flex:1;overflow-y:auto;min-height:0}
+/* Fila SLA en el panel */
+.sla-panel-row{display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:center;padding:5px 8px;border-radius:5px;margin-bottom:3px;background:var(--card);border:1px solid var(--border)}
+.sla-panel-row:hover{border-color:var(--yellow)}
+.sla-panel-tote{font-size:.58rem;font-family:monospace;color:var(--txt);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sla-panel-zona{font-size:.5rem;color:var(--sub);white-space:nowrap}
+.sla-panel-hrs{font-size:.7rem;font-weight:800;text-align:right}
+.sla-panel-badge{font-size:.5rem;font-weight:800;padding:2px 4px;border-radius:3px;text-transform:uppercase;white-space:nowrap}
+.sla-panel-badge.burnt{background:rgba(142,68,173,.4);color:#e8daef}
+.sla-panel-badge.red{background:rgba(231,76,60,.3);color:var(--red)}
+.sla-panel-badge.yellow{background:rgba(241,196,15,.25);color:var(--yellow)}
+.sla-panel-badge.green{background:rgba(39,174,96,.25);color:var(--green)}
+.sla-group-hdr{font-size:.58rem;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;padding:6px 8px 2px;margin-top:4px}
+
+/* ══ PROCESO SWITCH ════════════════════════════════════════ */
+.process-selector{display:flex;gap:3px;background:var(--card);padding:3px;border-radius:6px;border:1px solid var(--border);margin-left:10px}
+.proc-btn{background:transparent;border:none;color:var(--sub);padding:4px 14px;font-weight:800;font-size:.68rem;border-radius:4px;cursor:pointer;transition:all .2s;letter-spacing:.05em}
+.proc-btn.putaway.active{background:#1a4a8a;color:#7ec8ff}
+.proc-btn.picking.active{background:#3a1a6a;color:#c39bff}
+.proc-btn:hover:not(.active){color:var(--txt)}
+
+/* ══ PANEL IZQUIERDO (SLA / ZPT) ══════════════════════════ */
+.panel-left{width:290px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;z-index:20}
+.canvas-wrap{flex:1;position:relative;overflow:hidden}
+
+/* SLA PUTAWAY — filas en panel izquierdo */
+.sla-left-row{display:grid;grid-template-columns:1fr auto;gap:4px;align-items:start;padding:6px 8px;border-radius:5px;margin-bottom:3px;background:var(--card);border:1px solid var(--border);cursor:default}
+.sla-left-row:hover{border-color:var(--accent)}
+.sla-left-tote{font-size:.62rem;font-family:monospace;color:var(--txt);font-weight:700}
+.sla-left-meta{font-size:.5rem;color:var(--sub);margin-top:2px;line-height:1.4}
+.sla-left-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.sla-left-hrs{font-size:.75rem;font-weight:800}
+.sla-left-badge{font-size:.5rem;font-weight:800;padding:2px 5px;border-radius:3px;text-transform:uppercase;white-space:nowrap}
+.sla-left-badge.burnt{background:rgba(142,68,173,.4);color:#e8daef}
+.sla-left-badge.red{background:rgba(231,76,60,.3);color:var(--red)}
+.sla-left-badge.yellow{background:rgba(241,196,15,.25);color:var(--yellow)}
+.sla-left-badge.green{background:rgba(39,174,96,.25);color:var(--green)}
+
+/* ZPT PICKING */
+.zpt-card{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px}
+.zpt-card.urgent{border-color:var(--red)}
+.zpt-card.warning{border-color:var(--yellow)}
+.zpt-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.zpt-hour{font-size:.75rem;font-weight:800;color:var(--txt)}
+.zpt-countdown{font-size:.8rem;font-weight:900;font-family:monospace}
+.zpt-meta{font-size:.55rem;color:var(--sub)}
+.zpt-bar-wrap{height:4px;background:var(--border);border-radius:2px;margin-top:5px}
+.zpt-bar{height:4px;border-radius:2px;transition:width .5s}
+.pick-left-row{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;padding:5px 8px;border-radius:5px;margin-bottom:3px;background:var(--card);border:1px solid var(--border)}
+.pick-left-tote{font-size:.6rem;font-family:monospace;color:var(--txt);font-weight:700}
+.pick-left-zone{font-size:.5rem;color:var(--sub)}
+
+/* ══ PUTAWAY TOOL MODAL ════════════════════════════════════ */
+.pt-modal{position:fixed;inset:0;background:rgba(7,8,14,.97);backdrop-filter:blur(12px);z-index:200;display:none;flex-direction:column;overflow:hidden}
+.pt-modal.open{display:flex}
+.pt-modal-head{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)}
+.pt-modal-title{font-size:.9rem;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+.pt-modal-close{background:none;border:none;color:var(--sub);font-size:1.2rem;cursor:pointer;padding:0 4px}.pt-modal-close:hover{color:#fff}
+.pt-summary{display:flex;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);flex-wrap:wrap}
+.pt-sum-stat{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 14px;text-align:center}
+.pt-sum-v{font-size:.95rem;font-weight:900;line-height:1}
+.pt-sum-l{font-size:.44rem;color:var(--sub);text-transform:uppercase;margin-top:3px}
+.pt-piso-tabs{display:flex;gap:5px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap}
+.pt-piso-tab{background:var(--card);border:1px solid var(--border);color:var(--sub);padding:5px 16px;border-radius:5px;font-size:.7rem;font-weight:800;cursor:pointer;transition:all .15s}
+.pt-piso-tab.active{background:rgba(0,243,255,.12);color:var(--cyan);border-color:var(--cyan)}
+.pt-piso-tab:hover:not(.active){color:var(--txt)}
+.pt-body{flex:1;overflow-y:auto;padding:14px 16px}
+.pt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.pt-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s}
+.pt-card:hover{border-color:var(--cyan)}
+.pt-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pt-pasillo{font-size:1.1rem;font-weight:900;color:var(--cyan);font-family:monospace}
+.pt-lado-badge{font-size:.6rem;font-weight:800;padding:2px 7px;border-radius:3px;background:rgba(241,196,15,.15);color:var(--yellow)}
+.pt-rep{font-size:.72rem;font-weight:700;color:var(--txt);margin-bottom:3px;font-family:monospace}
+.pt-manager{font-size:.52rem;color:var(--sub);margin-bottom:7px}
+.pt-bar-wrap{height:3px;background:var(--border);border-radius:2px;margin-bottom:8px}
+.pt-bar{height:3px;border-radius:2px;transition:width .4s}
+.pt-metrics{display:flex;gap:6px}
+.pt-met{flex:1;background:rgba(0,0,0,.3);border-radius:5px;padding:5px 6px;text-align:center}
+.pt-met-v{font-size:.88rem;font-weight:800;line-height:1}
+.pt-met-l{font-size:.44rem;color:var(--sub);text-transform:uppercase;margin-top:2px}
+.pt-empty{color:var(--sub);font-size:.75rem;text-align:center;padding:40px;grid-column:1/-1}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <div class="zone-title" id="topbar-title">📦 Putaway — CD-01</div>
+    <div class="zone-sub">MZ · HV · BL · Monitor Operacional Unificado</div>
+  </div>
+  <!-- Switch Proceso -->
+  <div class="process-selector">
+    <button class="proc-btn putaway active" id="btn-putaway" onclick="switchProcess('PUTAWAY')">📦 PUTAWAY</button>
+    <button class="proc-btn picking" id="btn-picking" onclick="switchProcess('PICKING')">🛒 PICKING</button>
+  </div>
+  <button class="sla-btn" id="btn-putaway-tool" style="background:rgba(0,243,255,.1);border-color:var(--cyan);color:var(--cyan)" onclick="togglePutawayToolMode()">🗺 PUTAWAY TOOL</button>
+  <div class="floor-selector">
+    <button class="floor-btn active" onclick="setFloor(0,this)">Piso 0</button>
+    <button class="floor-btn" onclick="setFloor(1,this)">Piso 1</button>
+    <button class="floor-btn" onclick="setFloor(2,this)">Piso 2</button>
+    <button class="floor-btn" onclick="setFloor(3,this)">Piso 3 + HV</button>
+  </div>
+  <div class="topbar-kpis" id="topbar-kpis"></div>
+  <div class="live"><div class="ldot"></div><span id="clock-sm">--:--</span></div>
+</div>
+
+<div class="main-wrapper">
+  <!-- Panel Izquierdo: SLA Putaway / ZPT Picking -->
+  <div class="panel panel-left" id="panel-left">
+    <div class="panel-head">
+      <div class="panel-title" id="left-panel-title">⏱ SLA Pendiente</div>
+      <div style="font-size:.52rem;color:var(--sub);margin-top:2px" id="left-panel-sub">ordenado por urgencia</div>
+    </div>
+    <div class="tab-content" id="left-panel-content" style="padding:4px 8px"></div>
+  </div>
+
+  <!-- Canvas 3D central -->
+  <div class="canvas-wrap">
+    <canvas id="three-canvas"></canvas>
+    <div id="labels-container"></div>
+    <div class="nav-hint">↔ Arrastrá · Rueda scroll · Click en rep para detalles</div>
+  </div>
+
+  <!-- Panel Derecho: Totes KPIs + Reps -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">📦 Totes Pendientes</div>
+    </div>
+    <div class="zone-cards" id="zone-cards"></div>
+    <div class="panel-tabs">
+      <button class="ptab active" id="ptab-reps" onclick="switchPanelTab('reps')">👷 REPS</button>
+      <button class="ptab" id="ptab-secondary" onclick="switchPanelTab('secondary')">⏱ SLA</button>
+    </div>
+    <div class="tab-content">
+      <div id="tab-reps" style="padding:4px 8px"></div>
+      <div id="tab-secondary" style="display:none;padding:4px 8px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="hover-tooltip"></div>
+
+<!-- REP POPUP -->
+<div class="popup-box" id="rep-popup" style="border:1px solid var(--cyan);box-shadow:0 0 28px rgba(0,243,255,.2)">
+  <div class="pop-header">
+    <span class="pop-title-txt" id="rep-popup-title" style="color:var(--cyan)">Rep</span>
+    <button class="pop-close-btn" onclick="closePopup()">✕</button>
+  </div>
+  <div id="rep-popup-body"></div>
+</div>
+
+<!-- SLA MZ-0 MODAL -->
+<div class="sla-modal" id="sla-modal">
+  <div class="sla-modal-head">
+    <span class="sla-modal-title">📋 Totes MZ-0 Pendientes</span>
+    <button class="sla-modal-close" onclick="toggleSlaPanel()">✕</button>
+  </div>
+  <div class="sla-modal-stats" id="sla-stats"></div>
+  <div class="sla-table" id="sla-table"></div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-txt" id="loading-txt">Cargando datos...</div>
+</div>
+
+<script>
+// ══ CONFIG ══════════════════════════════════════════════
+const GRID_DOC_ID   = 'YOUR_DOCUMENT_ID';
+const GRID_TOKEN    = '';  // token de la API de datos (no se usa en el demo)
+const DATASET_REPS          = 'reps_putaway';
+const DATASET_TOTES         = 'totes_putaway';
+const DATASET_BINFULL       = 'binfullness_cd01';
+const DATASET_PICKING_REPS    = 'reps_picking';         // Q2A: 1 fila por rep (posición)
+const DATASET_PICKING_DETAIL  = 'reps_picking_detail';  // Q2B: N filas por rep (ruta picks)
+const DATASET_ZPTS            = 'zpts_picking';         // Q1: cola de CPTs
+const DATASET_PUTAWAY_TOOL    = 'putaway_tool';         // V_SUGERENCIA_PUTAWAY_TOOL_TURNOS
+const REFRESH_MS            = 120000; // 2 min
+
+// ══ CONSTANTES 3D ═══════════════════════════════════════
+// X = calle (1-60) | Z = profundidad
+//   Lado A: Z = LADO_A_Z0..AISLE_Z  (módulos 1-20)
+//   BL aisle: Z = AISLE_Z..LADO_B_Z0
+//   Lado B: Z = LADO_B_Z0..TOTAL_DEPTH (módulos 21-40)
+const NUM_CALLES  = 60;
+const MODS_A      = 20;
+const MODS_B      = 20;
+const RACK_W      = 0.90;  // ancho del bloque de rack (lado izquierdo de la calle)
+const PASILLO_W   = 0.75;  // ancho del pasillo (lado derecho, donde camina el rep)
+const TOTE_W      = RACK_W;
+const TOTE_H      = 0.75;  // altura del rack
+const TOTE_D      = 0.46;  // profundidad de cada módulo en Z
+const CALLE_STEP  = RACK_W + PASILLO_W;  // 1.65 total por calle
+const MOD_STEP    = 0.50;  // paso Z entre módulos
+const AISLE_W     = 1.55;  // ancho pasillo BL
+const LADO_A_Z0   = 0.3;
+const AISLE_Z     = LADO_A_Z0 + MODS_A * MOD_STEP;   // 10.3
+const BL_Z        = AISLE_Z + AISLE_W / 2;            // 11.075
+const LADO_B_Z0   = AISLE_Z + AISLE_W;                // 11.85
+const TOTAL_DEPTH = LADO_B_Z0 + MODS_B * MOD_STEP;   // 21.85
+const TOTAL_WIDTH = NUM_CALLES * CALLE_STEP;           // 99
+
+// ══ ESTADO ══════════════════════════════════════════════
+let repsMap        = new Map();
+let zoneStats      = { 'MZ-0':{green:0,yellow:0,red:0,burnt:0}, 'GM':{green:0,yellow:0,red:0,burnt:0}, 'HV':{green:0,yellow:0,red:0,burnt:0} };
+let allTotes       = [];
+let allReps        = [];      // reps putaway
+let allPickingReps   = [];    // Q2A: 1 fila por rep (posición en mapa)
+let allPickingDetail = [];    // Q2B: N filas por rep (ruta de picks pendientes)
+let allZPTs          = [];    // Q1: cola de CPTs
+let allBinfull     = [];
+let binfullMap     = new Map();
+let allPutawayTool         = [];
+let activePisoPT           = null;
+let putawayToolMode        = false;
+let putawayToolOverlayGroup = null;
+let activeTab      = 'reps';
+let currentProcess = 'PUTAWAY'; // 'PUTAWAY' | 'PICKING'
+let activeWorkers = [];
+let currentFloor  = 0;
+let selectedRep   = null;
+
+// ══ GRID API ═════════════════════════════════════════════
+async function loadDataset(name) {
+  try {
+    const metaRes = await fetch(
+      `https://YOUR_DATA_HOST/api/v1/documents/${GRID_DOC_ID}/datasets/${name}`,
+      { credentials: 'include' }
+    );
+    if (!metaRes.ok) { console.warn(`[Dataset] ${name} HTTP ${metaRes.status}`); return null; }
+    const meta = await metaRes.json();
+    if (!meta.download_url) { console.warn(`[Dataset] ${name}: sin download_url`); return null; }
+    const dataRes = await fetch(meta.download_url);
+    if (!dataRes.ok) { console.warn(`[Dataset] ${name} download HTTP ${dataRes.status}`); return null; }
+    const json = await dataRes.json();
+    return Array.isArray(json) ? json : (json.data || json.rows || []);
+  } catch(e) { console.warn(`[Dataset] ${name} error:`, e); return null; }
+}
+
+// ══ PROCESAMIENTO ════════════════════════════════════════
+
+// Parsing ultra-robusto de ULTIMA_UBICACION (ej: MZ-01-10-20)
+function parseUbicacion(r) {
+  let piso = null, calle = null, modulo = null;
+
+  // UBICACION_PENDIENTE viene de picking; ULTIMA_UBICACION de putaway
+  const ubi = String(r.UBICACION_PENDIENTE || r.ULTIMA_UBICACION || r.ULTIMA_UBI || r.UBICACION || '').trim().toUpperCase();
+  if (ubi) {
+    const nums = ubi.match(/\d+/g);
+    if (nums && nums.length >= 3) {
+      piso   = parseInt(nums[0], 10);
+      calle  = parseInt(nums[1], 10);
+      modulo = parseInt(nums[2], 10);
+    } else if (nums && nums.length === 2) {
+      calle  = parseInt(nums[0], 10);
+      modulo = parseInt(nums[1], 10);
+    }
+  }
+
+  if (piso === null && r.PISO !== undefined && r.PISO !== null && r.PISO !== '') {
+    const p = parseInt(String(r.PISO).replace(/\D/g, ''), 10);
+    if (!isNaN(p)) piso = p;
+  }
+  if (calle === null && (r.CALLE || r.PASILLO)) {
+    const c = parseInt(String(r.CALLE || r.PASILLO).replace(/\D/g, ''), 10);
+    if (!isNaN(c)) calle = c;
+  }
+  if (modulo === null && r.MODULO) {
+    const m = parseInt(String(r.MODULO).replace(/\D/g, ''), 10);
+    if (!isNaN(m)) modulo = m;
+  }
+
+  // Sanitización y límites
+  if (piso   === null || isNaN(piso))                              piso   = null;
+  if (calle  === null || isNaN(calle) || calle < 1 || calle > NUM_CALLES) calle = null;
+  if (modulo === null || isNaN(modulo) || modulo < 1)             modulo = 1;
+  if (modulo > (MODS_A + MODS_B))                                 modulo = MODS_A + MODS_B;
+
+  // Detectar zona: AREA (picking) o prefijo de dirección (putaway)
+  const zona = (r.AREA ? String(r.AREA).trim().toUpperCase() : null)
+            || ubi.match(/^([A-Z]+)/)?.[1]
+            || '';
+
+  return { piso, calle, modulo, zona };
+}
+
+// Zonas permitidas en el mapa 3D (RK queda fuera)
+const ZONAS_MAPA = new Set(['MZ', 'BL']);
+
+function processReps(rows) {
+  const map = new Map();
+  (rows || []).forEach(r => {
+    const pos = parseUbicacion(r);
+    r._piso   = pos.piso;
+    r._calle  = pos.calle;
+    r._modulo = pos.modulo;
+    r._zona   = pos.zona;
+    // Solo MZ y BL; RK y cualquier otra zona → fuera del mapa
+    if (!ZONAS_MAPA.has(pos.zona) && pos.zona !== '') return;
+    if (r._calle === null) return;
+    const key = `${r._piso}-${r._calle}`;
+    if (!map.has(key)) map.set(key, r);
+  });
+  return map;
+}
+
+function processBinfull(rows) {
+  const map = new Map();
+  (rows || []).forEach(r => {
+    const area  = String(r.AREA  || 'MZ').trim().toUpperCase();
+    const piso  = parseInt(r.PISO)  || 0;
+    const calle = parseInt(r.CALLE) || 0;
+    if (!calle) return;
+    const key = `${area}-${piso}-${calle}`;
+    map.set(key, r);
+  });
+  return map;
+}
+
+function processTotes(rows) {
+  const stats = {
+    'MZ-0': {green:0,yellow:0,red:0,burnt:0},
+    'GM':   {green:0,yellow:0,red:0,burnt:0},
+    'HV':   {green:0,yellow:0,red:0,burnt:0}
+  };
+  (rows || []).forEach(r => {
+    const sla  = (r.SEMAFORO_PUTAWAY || 'VERDE').toUpperCase();
+    const b    = sla==='VERDE'?'green':sla==='AMARILLO'?'yellow':sla==='ROJO'?'red':'burnt';
+    const zona = (r.ZONA_ESTIMADA || '');
+    if (zona.includes('MZ-0'))      stats['MZ-0'][b]++;
+    else if (zona.includes('GM'))   stats['GM'][b]++;
+    else if (zona.includes('HV'))   stats['HV'][b]++;
+    else                            stats['GM'][b]++; // fallback a GM
+  });
+  return stats;
+}
+
+// ══ THREE.JS SETUP ═══════════════════════════════════════
+const canvas = document.getElementById('three-canvas');
+const labelsContainer = document.getElementById('labels-container');
+const PANEL_W      = 262; // panel derecho
+const LEFT_PANEL_W = 290; // panel izquierdo
+let W = window.innerWidth - PANEL_W - LEFT_PANEL_W, H = window.innerHeight - 42;
+
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x07080e);
+const camera   = new THREE.PerspectiveCamera(42, W/H, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dirL = new THREE.DirectionalLight(0xffffff, 1.0);
+dirL.position.set(50, 70, 40); scene.add(dirL);
+
+// Cage group (HV - Piso 3, calles 01-20)
+const cageGroup = new THREE.Group();
+cageGroup.visible = false;
+scene.add(cageGroup);
+
+// Selección rep (anillo cyan)
+const selGroup = new THREE.Group();
+const selRing  = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.65, 32), new THREE.MeshBasicMaterial({color:0x00f3ff,side:THREE.DoubleSide,transparent:true,opacity:0.9}));
+selRing.rotation.x = -Math.PI/2; selRing.position.y = 0.02; selGroup.add(selRing);
+const selArrow = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.6, 4), new THREE.MeshBasicMaterial({color:0x9b59b6}));
+selArrow.rotation.x = Math.PI; selArrow.position.y = 3.0; selGroup.add(selArrow);
+selGroup.visible = false; scene.add(selGroup);
+
+// ══ ESCENA ESTÁTICA ══════════════════════════════════════
+(function buildStatic(){
+  // Piso base
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(TOTAL_WIDTH+6,TOTAL_DEPTH+8), new THREE.MeshLambertMaterial({color:0x090b18}));
+  fl.rotation.x = -Math.PI/2; fl.position.set(TOTAL_WIDTH/2,-0.01,TOTAL_DEPTH/2); scene.add(fl);
+
+  // Pasillo BL central (franja oscura + líneas amarillas)
+  const al = new THREE.Mesh(new THREE.PlaneGeometry(TOTAL_WIDTH+6,AISLE_W+0.3), new THREE.MeshLambertMaterial({color:0x0c0e1a}));
+  al.rotation.x = -Math.PI/2; al.position.set(TOTAL_WIDTH/2,0.002,BL_Z); scene.add(al);
+  [-AISLE_W/2+0.05, AISLE_W/2-0.05].forEach(off=>{
+    const ln = new THREE.Mesh(new THREE.PlaneGeometry(TOTAL_WIDTH+6,0.07), new THREE.MeshBasicMaterial({color:0xf1c40f}));
+    ln.rotation.x = -Math.PI/2; ln.position.set(TOTAL_WIDTH/2,0.005,BL_Z+off); scene.add(ln);
+  });
+
+  // Líneas divisorias: borde rack/pasillo + borde entre calles
+  const divRack    = new THREE.LineBasicMaterial({color:0x1a2550,transparent:true,opacity:0.5});
+  const divPasillo = new THREE.LineBasicMaterial({color:0x0a3a5a,transparent:true,opacity:0.9});
+  for (let c = 1; c <= NUM_CALLES; c++){
+    // Línea entre rack y pasillo (dentro de la calle)
+    const xRP = (c-1)*CALLE_STEP + RACK_W;
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(xRP,0.003,0),new THREE.Vector3(xRP,0.003,TOTAL_DEPTH)
+    ]),divPasillo));
+    // Línea entre calles (borde derecho = inicio del rack de la calle siguiente)
+    const xCC = c * CALLE_STEP;
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(xCC,0.003,0),new THREE.Vector3(xCC,0.003,TOTAL_DEPTH)
+    ]),divRack));
+  }
+
+  // Jaula Amarilla (HV = piso 3, calles 01-20)
+  const cageW = 20*CALLE_STEP, cageDepth = MODS_B*MOD_STEP, cageH = 1.2;
+  const cageMesh = new THREE.Mesh(new THREE.BoxGeometry(cageW,cageH,cageDepth), new THREE.MeshBasicMaterial({color:0xf1c40f,transparent:true,opacity:0.15,depthWrite:false}));
+  cageMesh.position.set(cageW/2,cageH/2,LADO_B_Z0+cageDepth/2); cageGroup.add(cageMesh);
+  const cageEdge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(cageW,cageH,cageDepth)), new THREE.LineBasicMaterial({color:0xf1c40f,transparent:true,opacity:0.6}));
+  cageEdge.position.copy(cageMesh.position); cageGroup.add(cageEdge);
+})();
+
+// ══ ETIQUETAS 2D ═════════════════════════════════════════
+const streetLabelElems = [];
+const sectorLabelElems = [];
+
+for (let c = 1; c <= NUM_CALLES; c++){
+  const el = document.createElement('div');
+  el.className = 'street-label';
+  el.textContent = `C${String(c).padStart(2,'0')}`;
+  labelsContainer.appendChild(el);
+  // Label centrado sobre el pasillo (lado derecho de la calle)
+  streetLabelElems.push({ el, pos3D: new THREE.Vector3((c-1)*CALLE_STEP+RACK_W+PASILLO_W/2, 1.1, TOTAL_DEPTH+0.4), calle: c });
+}
+
+const secA = document.createElement('div');
+secA.className = 'sector-label';
+secA.textContent = 'JAULA AMARILLA (C01-C20)';
+labelsContainer.appendChild(secA);
+sectorLabelElems.push({ el: secA, pos3D: new THREE.Vector3(10*CALLE_STEP,1.8,LADO_B_Z0+(MODS_B*MOD_STEP)/2), isCageLabel: true });
+
+function updateHTML3DPositions(){
+  const pv = new THREE.Vector3();
+  [...streetLabelElems,...sectorLabelElems].forEach(item=>{
+    if (item.isCageLabel && currentFloor !== 3){ item.el.style.display='none'; return; }
+    pv.copy(item.pos3D); pv.project(camera);
+    const x=(pv.x*0.5+0.5)*W, y=(-(pv.y*0.5)+0.5)*H;
+    if (pv.z>1||x<-60||x>W+60){ item.el.style.display='none'; return; }
+    item.el.style.display='block';
+    item.el.style.left=`${x}px`;
+    item.el.style.top=`${y}px`;
+    // Highlight calle si tiene rep en el piso actual
+    if (item.calle !== undefined){
+      const hasRep = repsMap.has(`${currentFloor}-${item.calle}`);
+      item.el.className = 'street-label' + (hasRep?' has-rep':'');
+    }
+  });
+}
+
+// ══ BUILD FLOOR ══════════════════════════════════════════
+let floorGroup  = null;
+let interactableWorkers = []; // { group, repData }
+
+const toteGeo = new THREE.BoxGeometry(TOTE_W, TOTE_H, TOTE_D);
+
+// Colores de zona por piso
+const ZONE_COLORS = {
+  0: 0x1a4a8a,  // MZ-0 Afinidades → azul
+  1: 0x8a3a10,  // MZ-1 GM → naranja oscuro
+  2: 0x8a3a10,  // MZ-2 GM
+  3: 0x6a6a10   // MZ-3 GM / HV → amarillo oscuro
+};
+const REP_CALLE_COLOR = 0x004466; // fondo de calle activa
+
+function buildFloor(pisoIdx){
+  if (floorGroup) scene.remove(floorGroup);
+  floorGroup = new THREE.Group();
+  interactableWorkers = [];
+  activeWorkers.forEach(w => scene.remove(w));
+  activeWorkers = [];
+  selGroup.visible = false;
+  closePopup();
+
+  cageGroup.visible = (pisoIdx === 3);
+
+  // Generar módulos para este piso
+  // Lado A: módulos 1-20 en Z bajo (LADO_A_Z0), Lado B: módulos 21-40 en Z alto (LADO_B_Z0)
+  // Ambos lados centrados en el mismo X de la calle → 2 bloques sólidos por calle
+  const modules = [];
+  for (let c = 1; c <= NUM_CALLES; c++){
+    for (let m = 1; m <= MODS_A+MODS_B; m++){
+      const side = m <= MODS_A ? 'A' : 'B';
+      const mi0  = side === 'A' ? m - 1 : m - MODS_A - 1;
+      const z    = side === 'A'
+        ? LADO_A_Z0 + mi0*MOD_STEP + TOTE_D/2
+        : LADO_B_Z0 + mi0*MOD_STEP + TOTE_D/2;
+      modules.push({ calle:c, modulo:m, side, z });
+    }
+  }
+
+  const modCount = modules.length;
+  const zoneColor = ZONE_COLORS[pisoIdx] || 0x333344;
+  const mat = new THREE.MeshStandardMaterial({ color: zoneColor, roughness:0.4, metalness:0.1 });
+  const iMesh = new THREE.InstancedMesh(toteGeo, mat, modCount);
+  iMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  iMesh.count = modCount;
+
+  // Enable per-instance color
+  iMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(modCount*3), 3);
+
+  const dummy = new THREE.Object3D();
+  const color  = new THREE.Color();
+
+  modules.forEach((mod, idx) => {
+    // Rack en el LADO IZQUIERDO de la calle.
+    // El PASILLO (negro, vacío) ocupa el lado derecho → donde camina el rep.
+    // Calle N: rack en X = (N-1)*CALLE_STEP + RACK_W/2
+    //          pasillo en X = (N-1)*CALLE_STEP + RACK_W ... N*CALLE_STEP
+    //          rep en X = (N-1)*CALLE_STEP + RACK_W + PASILLO_W/2
+    const cx = (mod.calle - 1) * CALLE_STEP + RACK_W / 2;
+
+    // Piso 3 calles 01-20 = HV (jaula amarilla)
+    const isHV = (pisoIdx === 3 && mod.calle <= 20);
+
+    dummy.position.set(cx, TOTE_H/2+0.005, mod.z);
+    dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1); dummy.updateMatrix();
+    iMesh.setMatrixAt(idx, dummy.matrix);
+
+    const hasRep = repsMap.has(`${pisoIdx}-${mod.calle}`);
+
+    // Color por binfullness (saturación) si hay data, si no fallback zona
+    const bfKey = `MZ-${pisoIdx}-${mod.calle}`;
+    const bfRec = binfullMap.get(bfKey);
+    const bfPct = bfRec ? parseFloat(bfRec.BF_PROMEDIO_PCT) : null;
+
+    if (isHV) {
+      color.set(0x665500); // jaula amarilla HV
+    } else if (bfPct !== null && !isNaN(bfPct)) {
+      // Semáforo saturación: >70% rojo, 50-70% amarillo, <50% verde
+      if      (bfPct >= 70) color.set(0x6b1515); // rojo oscuro
+      else if (bfPct >= 50) color.set(0x5a4000); // amarillo oscuro
+      else                  color.set(0x1a4a20); // verde oscuro
+    } else if (hasRep) {
+      color.set(0x003850); // azul rep activo (sin data binfull)
+    } else {
+      color.set(zoneColor); // color por zona (fallback)
+    }
+    iMesh.setColorAt(idx, color);
+  });
+
+  iMesh.instanceMatrix.needsUpdate = true;
+  iMesh.instanceColor.needsUpdate  = true;
+  floorGroup.add(iMesh);
+  scene.add(floorGroup);
+
+  // Mostrar ambos — putaway amarillo + picking azul
+  allReps.filter(r => r._piso === pisoIdx && r._calle !== null).forEach(rep => {
+    addRepFigure(rep._calle, rep, false);
+  });
+  allPickingReps.filter(r => r._piso === pisoIdx && r._calle !== null).forEach(rep => {
+    addRepFigure(rep._calle, rep, true);
+  });
+
+  updateSidePanel(pisoIdx);
+}
+
+// ══ FIGURAS DE REPS ═══════════════════════════════════════
+// Putaway — amarillo entero, zapatos negros
+const REP_MAT_TORSO = new THREE.MeshStandardMaterial({color:0xf5c400, roughness:0.4});
+const REP_MAT_HEAD  = new THREE.MeshStandardMaterial({color:0xf5c5a0, roughness:0.5});
+const REP_MAT_CAP   = new THREE.MeshStandardMaterial({color:0xf5c400, roughness:0.3}); // gorra amarilla
+const REP_MAT_LEGS  = new THREE.MeshStandardMaterial({color:0xf5c400, roughness:0.5});
+const REP_MAT_SHOES = new THREE.MeshStandardMaterial({color:0x111111, roughness:0.6});
+// Picking — gorra azul, polera blanca, short azul, zapatos negros
+const PICK_MAT_TORSO = new THREE.MeshStandardMaterial({color:0xe8f0fe, roughness:0.3}); // polera blanca
+const PICK_MAT_CAP   = new THREE.MeshStandardMaterial({color:0x1a56a0, roughness:0.3}); // gorra azul
+const PICK_MAT_LEGS  = new THREE.MeshStandardMaterial({color:0x1a56a0, roughness:0.5}); // short azul
+const PICK_MAT_RING  = new THREE.MeshStandardMaterial({color:0x1a56a0, roughness:0.3, emissive:0x0a3060, emissiveIntensity:0.5});
+
+function calcRepZ(repData){
+  let modulo = repData._modulo || 1;
+  if (modulo < 1) modulo = 1;
+  if (modulo > MODS_A + MODS_B) modulo = MODS_A + MODS_B;
+
+  if (modulo <= MODS_A)
+    return LADO_A_Z0 + (modulo - 1) * MOD_STEP + MOD_STEP / 2;
+  else
+    return LADO_B_Z0 + (modulo - MODS_A - 1) * MOD_STEP + MOD_STEP / 2;
+}
+
+function addRepFigure(calle, repData, isPicking){
+  if (!calle || calle < 1 || calle > NUM_CALLES) return;
+
+  const xPos = (calle - 1) * CALLE_STEP + RACK_W + PASILLO_W / 2;
+  const repZ = calcRepZ(repData);
+
+  // Seleccionar materiales por proceso
+  const matTorso = isPicking ? PICK_MAT_TORSO : REP_MAT_TORSO;
+  const matCap   = isPicking ? PICK_MAT_CAP   : REP_MAT_CAP;
+  const matLegs  = isPicking ? PICK_MAT_LEGS  : REP_MAT_LEGS;
+
+  const wGroup = new THREE.Group();
+  wGroup.position.set(xPos, 0, repZ);
+  wGroup.userData = { baseX: xPos, baseZ: repZ, phase: calle * 1.73 + repZ * 0.3, repData, calle, isPicking };
+
+  const shoeGeo = new THREE.BoxGeometry(0.16, 0.08, 0.18);
+  const legGeo  = new THREE.BoxGeometry(0.14, 0.36, 0.14);
+
+  const legPivots = [];
+  [-0.1, 0.1].forEach((off) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(off, 0.44, 0);
+    wGroup.add(pivot);
+    legPivots.push(pivot);
+
+    const leg = new THREE.Mesh(legGeo, matLegs);
+    leg.position.set(0, -0.18, 0);
+    pivot.add(leg);
+
+    const shoe = new THREE.Mesh(shoeGeo, REP_MAT_SHOES);
+    shoe.position.set(0, -0.40, 0.02);
+    pivot.add(shoe);
+  });
+  wGroup.userData.legPivots = legPivots;
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.42, 0.22), matTorso);
+  torso.position.set(0, 0.65, 0);
+  torso.userData = { isRep: true, repData, calle, xPos, repZ, isPicking };
+  wGroup.add(torso);
+  interactableWorkers.push(torso);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), REP_MAT_HEAD);
+  head.position.set(0, 1.00, 0);
+  head.userData = torso.userData;
+  wGroup.add(head);
+  interactableWorkers.push(head);
+
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 8), matCap);
+  cap.position.set(0, 1.12, 0);
+  cap.userData = torso.userData;
+  wGroup.add(cap);
+  interactableWorkers.push(cap);
+
+  // Picking: anillo azul al nivel del suelo para identificar de lejos
+  if (isPicking) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.22, 0.03, 8, 16),
+      PICK_MAT_RING
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, 0.04, 0);
+    wGroup.add(ring);
+  }
+
+  scene.add(wGroup);
+  activeWorkers.push(wGroup);
+}
+
+// ══ SWITCH PROCESO ═══════════════════════════════════════
+function switchProcess(mode) {
+  currentProcess = mode;
+  document.getElementById('btn-putaway').classList.toggle('active', mode === 'PUTAWAY');
+  document.getElementById('btn-picking').classList.toggle('active', mode === 'PICKING');
+  document.getElementById('topbar-title').textContent =
+    mode === 'PUTAWAY' ? '📦 Putaway — CD-01' : '🛒 Picking — CD-01';
+  // Cambiar label del tab secundario según proceso
+  document.getElementById('ptab-secondary').textContent = mode === 'PICKING' ? '🚨 CPT' : '⏱ SLA';
+  // Resetear al tab REPS
+  activeTab = 'reps';
+  document.getElementById('ptab-reps').classList.add('active');
+  document.getElementById('ptab-secondary').classList.remove('active');
+  document.getElementById('tab-reps').style.display = '';
+  document.getElementById('tab-secondary').style.display = 'none';
+  renderLeftPanel();
+  buildFloor(currentFloor);
+  if (putawayToolMode) buildPutawayToolOverlay(currentFloor);
+}
+
+function renderLeftPanel() {
+  const content = document.getElementById('left-panel-content');
+  const title   = document.getElementById('left-panel-title');
+  const sub     = document.getElementById('left-panel-sub');
+  const SLA_H   = 48;
+
+  // ── PUTAWAY TOOL MODE ─────────────────────────────────────
+  if (putawayToolMode) {
+    const pisoKey = `MZ-${currentFloor}`;
+    const rows = allPutawayTool
+      .filter(r => String(r.PISO||'').toUpperCase() === pisoKey)
+      .sort((a,b) => (parseFloat(b.SIs_DISPONIBLES)||0) - (parseFloat(a.SIs_DISPONIBLES)||0));
+
+    title.textContent = `🗺 Putaway Tool · ${pisoKey}`;
+    sub.textContent   = `${rows.length} pasillos asignados`;
+
+    if (!rows.length){
+      content.innerHTML = `<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin asignaciones para ${pisoKey}<br><small>Cambiá el piso o revisá el N8N</small></div>`;
+      return;
+    }
+    const maxSis = Math.max(...rows.map(r => parseFloat(r.SIs_DISPONIBLES)||0)) || 1;
+    content.innerHTML = rows.map(r => {
+      const calle   = r.CALLE || r.PASILLO || '—';
+      const ldap    = r.OPERARIO_LDAP || r.LDAP_USER || '—';
+      const sis     = parseFloat(r.SIs_DISPONIBLES) || 0;
+      const hrs     = parseFloat(r.Horas_Putaway) || 0;
+      const lado    = r.LADO || '—';
+      const pct     = Math.round((sis/maxSis)*100);
+      const color   = sis > maxSis*0.7 ? 'var(--red)' : sis > maxSis*0.4 ? 'var(--yellow)' : 'var(--green)';
+      return `<div class="sla-left-row" style="border-left:3px solid ${color};cursor:pointer" onclick="focusCalle(${parseInt(calle)||1})">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:.8rem;font-weight:900;color:var(--cyan);font-family:monospace">C${String(calle).padStart(2,'0')}</span>
+            <span style="font-size:.55rem;background:rgba(241,196,15,.15);color:var(--yellow);padding:1px 5px;border-radius:3px">${lado}</span>
+          </div>
+          <div style="font-size:.66rem;font-weight:700;color:var(--txt);margin-bottom:4px">👷 ${ldap}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px">
+            <div style="height:3px;width:${pct}%;background:${color};border-radius:2px"></div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;padding-left:6px">
+          <div style="font-size:.75rem;font-weight:800;color:${color}">${Math.round(sis).toLocaleString()}</div>
+          <div style="font-size:.44rem;color:var(--sub);text-transform:uppercase">SIs</div>
+          <div style="font-size:.65rem;font-weight:700;color:var(--accent);margin-top:3px">${hrs.toFixed(1)}h</div>
+          <div style="font-size:.44rem;color:var(--sub);text-transform:uppercase">horas</div>
+        </div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  if (currentProcess === 'PUTAWAY') {
+    title.textContent = '⏱ SLA Putaway Pendiente';
+    sub.textContent   = 'menor tiempo restante primero';
+    // Ordenar por más tiempo esperando (= menos tiempo restante)
+    const sorted = [...allTotes].sort((a,b) =>
+      (parseFloat(b.HORAS_ESPERANDO)||0) - (parseFloat(a.HORAS_ESPERANDO)||0)
+    );
+    if (!sorted.length) {
+      content.innerHTML = '<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin totes pendientes ✓</div>';
+      return;
+    }
+    content.innerHTML = sorted.map(t => {
+      const hrs      = parseFloat(t.HORAS_ESPERANDO) || 0;
+      const restante = Math.max(0, SLA_H - hrs);
+      const sla      = (t.SEMAFORO_PUTAWAY || 'VERDE').toUpperCase();
+      const cls      = sla==='VERDE'?'green':sla==='AMARILLO'?'yellow':sla==='ROJO'?'red':'burnt';
+      const familia  = (t.FAMILIAS||'—').slice(0,28);
+      const zona     = t.ZONA_ESTIMADA || '—';
+      const seller   = t.SELLER_ID || t.INBOUND_ID || '—';
+      const quien    = t.ULTIMO_OPERARIO || t.OPERARIO_LDAP || '—';
+      const piso_dest = t.PISO_DESTINO || (t.ZONA_ESTIMADA||'').match(/\d/)?.[0] || '—';
+      return `<div class="sla-left-row">
+        <div>
+          <div class="sla-left-tote">${t.TOTE_ID||'—'}</div>
+          <div class="sla-left-meta">
+            📦 ${familia}<br>
+            🏷 Seller: ${seller} · Piso: ${piso_dest}<br>
+            👷 ${quien} · ${hrs.toFixed(1)}h esperando
+          </div>
+        </div>
+        <div class="sla-left-right">
+          <span class="sla-left-hrs" style="color:var(--${cls})">${restante.toFixed(0)}h</span>
+          <span class="sla-left-badge ${cls}">${restante<6?'CRÍTICO':restante<12?'URGENTE':sla}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+  } else {
+    // PICKING — ZPTs por horario
+    title.textContent = '🚨 Cortes ZPT';
+    sub.textContent   = 'próximos vencimientos';
+
+    if (!allZPTs.length) {
+      // Sin datos todavía → placeholder estructurado
+      const now   = new Date();
+      const horas = [12,14,15,21].filter(h => h > now.getHours());
+      content.innerHTML = horas.map(h => {
+        const target = new Date(); target.setHours(h,0,0,0);
+        const diff   = Math.max(0, target - now);
+        const hh     = Math.floor(diff/3600000);
+        const mm     = Math.floor((diff%3600000)/60000);
+        const pct    = Math.max(5, Math.round((diff/(3*3600000))*100));
+        const urgent = hh < 1;
+        const warn   = hh < 2;
+        const color  = urgent ? 'var(--red)' : warn ? 'var(--yellow)' : 'var(--green)';
+        const cls    = urgent ? 'urgent' : warn ? 'warning' : '';
+        return `<div class="zpt-card ${cls}">
+          <div class="zpt-header">
+            <span class="zpt-hour">CORTE ${String(h).padStart(2,'0')}:00</span>
+            <span class="zpt-countdown" style="color:${color}">${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}</span>
+          </div>
+          <div class="zpt-meta">Conectar dataset <code>zpts_picking</code> para ver picks pendientes</div>
+          <div class="zpt-bar-wrap"><div class="zpt-bar" style="width:${Math.min(100,pct)}%;background:${color}"></div></div>
+        </div>`;
+      }).join('') || '<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin cortes pendientes hoy</div>';
+      return;
+    }
+
+    // Con data real de ZPTs — campo: CPT_VENCIMIENTO
+    const sorted = [...allZPTs].sort((a,b) => new Date(a.CPT_VENCIMIENTO) - new Date(b.CPT_VENCIMIENTO));
+    const now = new Date();
+    content.innerHTML = sorted.map(z => {
+      const target   = new Date(z.CPT_VENCIMIENTO);
+      const diff     = Math.max(0, target - now);
+      const hh       = Math.floor(diff/3600000);
+      const mm       = Math.floor((diff%3600000)/60000);
+      // Campos Q1
+      const pendientes = z.PENDIENTES || (z.PENDIENTES_SIN_PICKER||0) + (z.EN_PROCESO||0);
+      const pct_done   = z.PCT_AVANCE || 0;
+      const pickers    = z.PICKERS_ACTIVOS || '?';
+      const semaforo   = z.SEMAFORO_CPT || '';
+      const urgent     = semaforo === 'CRITICO' || semaforo === 'VENCIDA' || hh < 1;
+      const warn       = semaforo === 'ROJO' || hh < 2;
+      const color      = urgent ? 'var(--red)' : warn ? 'var(--yellow)' : 'var(--green)';
+      const cls        = urgent ? 'urgent' : warn ? 'warning' : '';
+      const horaLabel  = isNaN(target.getTime()) ? '??' : target.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+      const countdownLabel = isNaN(target.getTime()) ? '--:--' : `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+      return `<div class="zpt-card ${cls}">
+        <div class="zpt-header">
+          <span class="zpt-hour">CPT ${horaLabel}</span>
+          <span class="zpt-countdown" style="color:${color}">${countdownLabel}</span>
+        </div>
+        <div class="zpt-meta">${pendientes} picks pend. · ${pickers} pickers · ${pct_done}% avance</div>
+        <div class="zpt-bar-wrap"><div class="zpt-bar" style="width:${pct_done}%;background:${color}"></div></div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ══ PANEL LATERAL ════════════════════════════════════════
+function switchPanelTab(tab) {
+  activeTab = tab;
+  document.getElementById('ptab-reps').classList.toggle('active', tab === 'reps');
+  document.getElementById('ptab-secondary').classList.toggle('active', tab === 'secondary');
+  document.getElementById('tab-reps').style.display = tab === 'reps' ? '' : 'none';
+  document.getElementById('tab-secondary').style.display = tab === 'secondary' ? '' : 'none';
+  if (tab === 'secondary') {
+    if (currentProcess === 'PICKING') renderCptTab();
+    else renderSlaTab();
+  } else {
+    renderRepsTab(currentFloor);
+  }
+}
+
+function renderRepsTab(pisoIdx) {
+  const el = document.getElementById('tab-reps');
+  el.innerHTML = '';
+
+  // Panel derecho: según proceso activo muestra el grupo correspondiente
+  const isPick   = currentProcess === 'PICKING';
+  const rows     = (isPick ? allPickingReps : allReps)
+                    .filter(r => r._piso === pisoIdx && r._calle !== null);
+  const label    = isPick ? 'Picking' : 'Putaway';
+  const badge    = isPick
+    ? 'font-size:.45rem;background:#0f2f5a;color:#7ab0ea;border-radius:2px;padding:0 3px'
+    : 'font-size:.45rem;background:#4a3800;color:#f5c400;border-radius:2px;padding:0 3px';
+
+  if (!rows.length) {
+    el.innerHTML = `<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin reps ${label} en Piso ${pisoIdx}</div>`;
+    return;
+  }
+
+  const hdr = document.createElement('div');
+  hdr.style.cssText = 'font-size:.5rem;color:var(--sub);padding:4px 2px 2px;text-transform:uppercase;letter-spacing:.08em';
+  hdr.textContent = `${label} (${rows.length})`;
+  el.appendChild(hdr);
+
+  rows.forEach(rep => {
+    const ldap = rep.OPERARIO_LDAP || rep.PICKER_LDAP || rep.OPERARIO_USER_ID || '—';
+    const mins = parseInt(rep.MINUTOS_DESDE_ULTIMO_MOV) || 0;
+    const freshColor = mins > 30 ? 'var(--sub)' : isPick ? '#4a90d9' : '#f5c400';
+    const pos  = `P${rep._piso} C${String(rep._calle||0).padStart(2,'0')} M${String(rep._modulo||0).padStart(2,'0')}`;
+    const kpi  = isPick
+      ? `${rep.FALTAN||'?'} faltan · ${rep.PCT_AVANCE||0}%`
+      : `${rep.MOVIMIENTOS_1H||0} movs · ${rep.UNIDADES_1H||0} uds`;
+    const div = document.createElement('div');
+    div.className = 'rep-item active-rep';
+    div.innerHTML = `
+      <div class="ri-r1">
+        <span class="ri-ldap">${ldap} <span style="${badge}">${label.slice(0,4).toUpperCase()}</span></span>
+        <span class="ri-pasillo" style="font-size:.5rem">${pos}</span>
+      </div>
+      <div class="ri-r2">${kpi} · <span style="color:${freshColor}">${mins}min</span></div>`;
+    div.addEventListener('click', () => {
+      rep._isPicking = isPick;
+      cameraXTarget  = (rep._calle - 1) * CALLE_STEP + RACK_W + PASILLO_W / 2;
+      showRepPopup(rep);
+    });
+    el.appendChild(div);
+  });
+}
+
+function renderCptTab() {
+  const el = document.getElementById('tab-secondary');
+  if (!allZPTs.length) {
+    el.innerHTML = '<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin CPTs activos</div>';
+    return;
+  }
+  const sorted = [...allZPTs].sort((a,b) => new Date(a.CPT_VENCIMIENTO) - new Date(b.CPT_VENCIMIENTO));
+  const now = new Date();
+  el.innerHTML = '<div style="padding:4px 8px">' + sorted.map(z => {
+    const target = new Date(z.CPT_VENCIMIENTO);
+    const diff   = Math.max(0, target - now);
+    const hh     = Math.floor(diff/3600000);
+    const mm     = Math.floor((diff%3600000)/60000);
+    const pendientes = z.PENDIENTES || (z.PENDIENTES_SIN_PICKER||0) + (z.EN_PROCESO||0);
+    const pct_done   = z.PCT_AVANCE || 0;
+    const pickers    = z.PICKERS_ACTIVOS || '?';
+    const semaforo   = z.SEMAFORO_CPT || '';
+    const urgent     = semaforo === 'CRITICO' || semaforo === 'VENCIDA' || hh < 1;
+    const warn       = semaforo === 'ROJO' || hh < 2;
+    const color      = urgent ? 'var(--red)' : warn ? 'var(--yellow)' : 'var(--green)';
+    const cls        = urgent ? 'urgent' : warn ? 'warning' : '';
+    const horaLabel  = isNaN(target.getTime()) ? '??' : target.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    const countdown  = isNaN(target.getTime()) ? '--:--' : `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    return `<div class="zpt-card ${cls}" style="margin-bottom:6px">
+      <div class="zpt-header">
+        <span class="zpt-hour">CPT ${horaLabel}</span>
+        <span class="zpt-countdown" style="color:${color}">${countdown}</span>
+      </div>
+      <div class="zpt-meta">${pendientes} pend. · ${pickers} pickers · ${pct_done}% avance</div>
+      <div class="zpt-bar-wrap"><div class="zpt-bar" style="width:${Math.min(100,pct_done)}%;background:${color}"></div></div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderSlaTab() {
+  const el = document.getElementById('tab-secondary');
+  // Agrupar totes por zona, ordenar por HORAS_ESPERANDO desc (más urgente primero)
+  const groups = { 'MZ-0': [], 'GM': [], 'HV': [] };
+  allTotes.forEach(r => {
+    const zona = (r.ZONA_ESTIMADA || '');
+    if      (zona.includes('MZ-0')) groups['MZ-0'].push(r);
+    else if (zona.includes('HV'))   groups['HV'].push(r);
+    else                            groups['GM'].push(r);
+  });
+  const SLA_H = 48; // SLA total 48 horas desde ingreso
+  let html = '';
+  Object.entries(groups).forEach(([zona, totes]) => {
+    if (!totes.length) return;
+    totes.sort((a,b) => (parseFloat(b.HORAS_ESPERANDO)||0) - (parseFloat(a.HORAS_ESPERANDO)||0));
+    const zLabel = zona === 'MZ-0' ? 'MZ-0 Afinidades' : zona === 'HV' ? 'HV (High Value)' : 'GM (MZ-1/2/3)';
+    html += `<div class="sla-group-hdr">${zLabel} · ${totes.length} totes</div>`;
+    totes.forEach(r => {
+      const hrs     = parseFloat(r.HORAS_ESPERANDO) || 0;
+      const restante = Math.max(0, SLA_H - hrs);
+      const sla     = (r.SEMAFORO_PUTAWAY || 'VERDE').toUpperCase();
+      const cls     = sla === 'VERDE' ? 'green' : sla === 'AMARILLO' ? 'yellow' : sla === 'ROJO' ? 'red' : 'burnt';
+      const label   = restante < 6 ? 'CRÍTICO' : restante < 12 ? 'URGENTE' : sla;
+      html += `<div class="sla-panel-row">
+        <div>
+          <div class="sla-panel-tote">${r.TOTE_ID||'—'}</div>
+          <div class="sla-panel-zona">${(r.FAMILIAS||'—').slice(0,30)}</div>
+        </div>
+        <span class="sla-panel-hrs" style="color:var(--${cls})">${restante.toFixed(0)}h rest.</span>
+        <span class="sla-panel-badge ${cls}">${label}</span>
+      </div>`;
+    });
+  });
+  el.innerHTML = html || `<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin totes pendientes ✓</div>`;
+}
+
+function updateSidePanel(pisoIdx) {
+  // Zone cards (siempre visibles)
+  const zcEl = document.getElementById('zone-cards');
+  const total = (z) => z.green + z.yellow + z.red + z.burnt;
+  zcEl.innerHTML = `
+    <div class="zc mz0">
+      <div class="zc-header"><span class="zc-name">MZ-0 Afinidades</span><span class="zc-total">${total(zoneStats['MZ-0'])} totes</span></div>
+      <div class="zc-bars">
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--burnt)">${zoneStats['MZ-0'].burnt}</div><div class="zc-bar-l">&gt;12h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--red)">${zoneStats['MZ-0'].red}</div><div class="zc-bar-l">9-12h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--yellow)">${zoneStats['MZ-0'].yellow}</div><div class="zc-bar-l">6-9h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--green)">${zoneStats['MZ-0'].green}</div><div class="zc-bar-l">≤6h</div></div>
+      </div>
+    </div>
+    <div class="zc gm">
+      <div class="zc-header"><span class="zc-name">GM (MZ-1/2/3)</span><span class="zc-total">${total(zoneStats['GM'])} totes</span></div>
+      <div class="zc-bars">
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--burnt)">${zoneStats['GM'].burnt}</div><div class="zc-bar-l">&gt;12h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--red)">${zoneStats['GM'].red}</div><div class="zc-bar-l">9-12h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--yellow)">${zoneStats['GM'].yellow}</div><div class="zc-bar-l">6-9h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--green)">${zoneStats['GM'].green}</div><div class="zc-bar-l">≤6h</div></div>
+      </div>
+    </div>
+    <div class="zc hv">
+      <div class="zc-header"><span class="zc-name">HV (Piso 3 C01-20)</span><span class="zc-total">${total(zoneStats['HV'])} totes</span></div>
+      <div class="zc-bars">
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--burnt)">${zoneStats['HV'].burnt}</div><div class="zc-bar-l">&gt;12h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--red)">${zoneStats['HV'].red}</div><div class="zc-bar-l">9-12h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--yellow)">${zoneStats['HV'].yellow}</div><div class="zc-bar-l">6-9h</div></div>
+        <div class="zc-bar"><div class="zc-bar-v" style="color:var(--green)">${zoneStats['HV'].green}</div><div class="zc-bar-l">≤6h</div></div>
+      </div>
+    </div>`;
+
+  // Topbar KPIs
+  const allZones = ['MZ-0','GM','HV'];
+  const totBurnt = allZones.reduce((s,z)=>s+zoneStats[z].burnt,0);
+  const totRed   = allZones.reduce((s,z)=>s+zoneStats[z].red,0);
+  const totYell  = allZones.reduce((s,z)=>s+zoneStats[z].yellow,0);
+  const totGreen = allZones.reduce((s,z)=>s+zoneStats[z].green,0);
+  const totAll   = totBurnt+totRed+totYell+totGreen;
+  document.getElementById('topbar-kpis').innerHTML = `
+    <div class="tk"><div class="tk-dot" style="background:var(--burnt)"></div><span class="tk-v" style="color:var(--burnt)">${totBurnt}</span></div>
+    <div class="tk"><div class="tk-dot" style="background:var(--red)"></div><span class="tk-v" style="color:var(--red)">${totRed}</span></div>
+    <div class="tk"><div class="tk-dot" style="background:var(--yellow)"></div><span class="tk-v" style="color:var(--yellow)">${totYell}</span></div>
+    <div class="tk"><div class="tk-dot" style="background:var(--green)"></div><span class="tk-v" style="color:var(--green)">${totGreen}</span></div>
+    <span style="font-size:.62rem;color:var(--sub);margin-left:4px">${totAll} totes</span>`;
+
+  // Renderizar el tab activo
+  if (activeTab === 'reps') renderRepsTab(pisoIdx);
+  else if (currentProcess === 'PICKING') renderCptTab();
+  else renderSlaTab();
+}
+
+// ══ POPUP REP ════════════════════════════════════════════
+function showRepPopup(rep){
+  const isPicking  = rep._isPicking || rep.CPT_VENCIMIENTO !== undefined;
+  const ldap       = rep.OPERARIO_LDAP || rep.PICKER_LDAP || rep.OPERARIO_USER_ID || rep.PICKER_USER_ID || '—';
+  const mins       = parseInt(rep.MINUTOS_DESDE_ULTIMO_MOV)||0;
+  const freshColor = mins > 30 ? 'var(--red)' : mins > 15 ? 'var(--yellow)' : 'var(--green)';
+  const tipoBadge  = isPicking
+    ? `<span style="font-size:.5rem;background:#0f2f5a;color:#7ab0ea;border-radius:3px;padding:1px 5px;margin-left:6px">PICKING</span>`
+    : `<span style="font-size:.5rem;background:#4a3800;color:#f5c400;border-radius:3px;padding:1px 5px;margin-left:6px">PUTAWAY</span>`;
+
+  document.getElementById('rep-popup-title').innerHTML = ldap + tipoBadge;
+
+  let rows = `
+    <div class="pop-row"><span class="pop-lbl">Posición</span><span class="pop-val" style="font-family:monospace">P${rep._piso||0} C${String(rep._calle||0).padStart(2,'0')} M${String(rep._modulo||0).padStart(2,'0')}</span></div>`;
+
+  if (isPicking) {
+    const cptH   = rep.CPT_VENCIMIENTO ? new Date(rep.CPT_VENCIMIENTO).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const sColor = rep.SEMAFORO_CPT==='CRITICO'||rep.SEMAFORO_CPT==='VENCIDA' ? 'var(--red)'
+                 : rep.SEMAFORO_CPT==='ROJO' ? 'var(--red)'
+                 : rep.SEMAFORO_CPT==='AMARILLO' ? 'var(--yellow)' : 'var(--green)';
+    rows += `
+    <div class="pop-row"><span class="pop-lbl">Última posición</span><span class="pop-val" style="font-family:monospace;font-size:.58rem">${rep.ULTIMA_UBICACION||rep.UBICACION_PENDIENTE||'—'}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Último pick</span><span class="pop-val" style="color:${freshColor}">${mins} min atrás</span></div>
+    <div class="pop-row"><span class="pop-lbl">CPT activo</span><span class="pop-val" style="color:${sColor}">${cptH}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Picks faltan</span><span class="pop-val">${rep.FALTAN||'—'}</span></div>
+    <div class="pop-row"><span class="pop-lbl">% Avance</span><span class="pop-val">${rep.PCT_AVANCE||0}%</span></div>`;
+  } else {
+    rows += `
+    <div class="pop-row"><span class="pop-lbl">Zona</span><span class="pop-val">${rep.ZONA_DESCRIPTIVA||'—'}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Última ubicación</span><span class="pop-val" style="font-size:.58rem;font-family:monospace">${rep.ULTIMA_UBICACION||'—'}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Último tote</span><span class="pop-val" style="font-family:monospace">${rep.ULTIMO_TOTE||'—'}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Último movimiento</span><span class="pop-val" style="color:${freshColor}">${mins} min atrás</span></div>
+    <div class="pop-row"><span class="pop-lbl">Movimientos 1h</span><span class="pop-val">${rep.MOVIMIENTOS_1H||0}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Unidades 1h</span><span class="pop-val">${rep.UNIDADES_1H||0}</span></div>
+    <div class="pop-row"><span class="pop-lbl">Pasillos visitados</span><span class="pop-val">${rep.PASILLOS_VISITADOS||1}</span></div>`;
+  }
+
+  document.getElementById('rep-popup-body').innerHTML = rows;
+
+  // Mover selección al módulo exacto del rep (usar _calle/_modulo parseados)
+  const calle = rep._calle || parseInt(rep.CALLE) || 1;
+  const repZ  = calcRepZ(rep);
+  const repX  = (calle - 1) * CALLE_STEP + RACK_W + PASILLO_W / 2;
+  selGroup.position.set(repX, 0, repZ);
+  selGroup.visible = true;
+
+  document.getElementById('rep-popup').style.display='block';
+  selectedRep = rep;
+}
+
+function closePopup(){
+  document.getElementById('rep-popup').style.display='none';
+  selGroup.visible = false;
+  selectedRep = null;
+}
+
+// ══ CÁMARA ═══════════════════════════════════════════════
+// Arrancar en calle 12 (centro del pasillo de c12)
+let cameraXTarget=11*CALLE_STEP+RACK_W+PASILLO_W/2, cameraXCurrent=11*CALLE_STEP+RACK_W+PASILLO_W/2;
+camera.position.set(cameraXCurrent,28,-6);
+camera.lookAt(cameraXCurrent,0,TOTAL_DEPTH/2);
+
+function updateCamera(){
+  // Cámara encuadrada dentro de la caja del piso
+  cameraXTarget = Math.max(RACK_W+PASILLO_W/2, Math.min(TOTAL_WIDTH-PASILLO_W/2, cameraXTarget));
+  cameraXCurrent += (cameraXTarget - cameraXCurrent) * 0.1;
+  camera.position.set(cameraXCurrent,28,-6);
+  camera.lookAt(cameraXCurrent,0,TOTAL_DEPTH/2);
+}
+
+let isDragging=false, prevMX=0, mouseMovedAfterDown=false;
+canvas.addEventListener('mousedown',e=>{isDragging=true;prevMX=e.clientX;mouseMovedAfterDown=false;});
+window.addEventListener('mouseup',()=>isDragging=false);
+window.addEventListener('mousemove',e=>{
+  if(!isDragging)return;
+  const dx=Math.abs(e.clientX-prevMX);
+  if(dx>3) mouseMovedAfterDown=true;
+  cameraXTarget-=(e.clientX-prevMX)*0.075;
+  prevMX=e.clientX;
+});
+canvas.addEventListener('wheel',e=>{e.preventDefault();cameraXTarget+=e.deltaY*0.055;},{passive:false});
+window.addEventListener('resize',()=>{
+  W=window.innerWidth-PANEL_W-LEFT_PANEL_W; H=window.innerHeight-42;
+  renderer.setSize(W,H); camera.aspect=W/H; camera.updateProjectionMatrix();
+});
+
+// ══ CLICKS ═══════════════════════════════════════════════
+const raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2();
+const tooltip=document.getElementById('hover-tooltip');
+
+canvas.addEventListener('click',e=>{
+  if(mouseMovedAfterDown) return;
+  const r=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1;
+  mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(interactableWorkers);
+  if(hits.length>0){
+    const ud=hits[0].object.userData;
+    if(ud.isRep){
+      cameraXTarget=ud.xPos;
+      showRepPopup(ud.repData);
+      return;
+    }
+  }
+  closePopup();
+});
+
+canvas.addEventListener('mousemove',e=>{
+  if(isDragging){tooltip.style.display='none';return;}
+  const r=canvas.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1;
+  mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(interactableWorkers);
+  if(hits.length>0&&hits[0].object.userData.isRep){
+    const ud=hits[0].object.userData;
+    const ldap=ud.repData.OPERARIO_LDAP||ud.repData.PICKER_LDAP||ud.repData.OPERARIO_USER_ID||ud.repData.PICKER_USER_ID||'—';
+    const posLabel=ud.repData._calle?`C${String(ud.repData._calle).padStart(2,'0')}`:(ud.repData.PASILLO||'—');
+    tooltip.style.cssText=`display:block;left:${e.clientX+12}px;top:${e.clientY-22}px`;
+    tooltip.textContent=`${ldap} · ${posLabel}`;
+    canvas.style.cursor='pointer';
+  } else {
+    tooltip.style.display='none';
+    canvas.style.cursor='grab';
+  }
+});
+
+// ══ FLOOR SELECTOR ═══════════════════════════════════════
+function setFloor(piso, btn){
+  currentFloor=piso;
+  document.querySelectorAll('.floor-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  buildFloor(piso);
+  if (putawayToolMode) { buildPutawayToolOverlay(piso); renderLeftPanel(); }
+}
+
+// ══ ANIMACIÓN ════════════════════════════════════════════
+const clk=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clk.getElapsedTime();
+  updateCamera();
+  // Dancing workers
+  activeWorkers.forEach(w => {
+    const ph = w.userData.phase || 0;
+    // Rep fijo en su posición — sin flotación ni balanceo lateral
+    w.position.x = w.userData.baseX;
+    w.position.y = 0;
+    w.rotation.z = 0;
+    // Animación de caminata: piernas alternan adelante/atrás
+    if (w.userData.legPivots) {
+      const step = Math.sin(t * 3.5 + ph) * 0.28; // amplitud ~16°
+      w.userData.legPivots[0].rotation.x =  step;
+      w.userData.legPivots[1].rotation.x = -step;
+    }
+  });
+  if(selGroup.visible){
+    selArrow.position.y=2.8+Math.sin(t*6)*0.15;
+    selRing.rotation.z=t*2;
+  }
+  renderer.render(scene,camera);
+  updateHTML3DPositions();
+}
+
+// ══ RELOJ + refresh countdowns ZPT ═══════════════════════
+function updateClock(){
+  document.getElementById('clock-sm').textContent=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+  // Refrescar panel izquierdo en modo PICKING para actualizar countdowns cada minuto
+  if (currentProcess === 'PICKING') renderLeftPanel();
+}
+updateClock(); setInterval(updateClock,30000);
+
+// ══ SLA MZ-0 PANEL ═══════════════════════════════════════
+function toggleSlaPanel(){
+  const modal = document.getElementById('sla-modal');
+  modal.classList.toggle('open');
+  if (modal.classList.contains('open')) renderSlaPanel();
+}
+
+function renderSlaPanel(){
+  const mz0Totes = allTotes
+    .filter(r => (r.ZONA_ESTIMADA||'').includes('MZ-0'))
+    .sort((a,b)=>(parseFloat(b.HORAS_ESPERANDO)||0)-(parseFloat(a.HORAS_ESPERANDO)||0));
+
+  const cnt={green:0,yellow:0,red:0,burnt:0};
+  mz0Totes.forEach(r=>{
+    const b=(r.SEMAFORO_PUTAWAY||'VERDE').toUpperCase();
+    if(b==='VERDE')cnt.green++; else if(b==='AMARILLO')cnt.yellow++; else if(b==='ROJO')cnt.red++; else cnt.burnt++;
+  });
+
+  document.getElementById('sla-stats').innerHTML=`
+    <div class="sla-stat"><div class="sla-stat-v" style="color:var(--burnt)">${cnt.burnt}</div><div class="sla-stat-l">&gt;12h</div></div>
+    <div class="sla-stat"><div class="sla-stat-v" style="color:var(--red)">${cnt.red}</div><div class="sla-stat-l">9-12h</div></div>
+    <div class="sla-stat"><div class="sla-stat-v" style="color:var(--yellow)">${cnt.yellow}</div><div class="sla-stat-l">6-9h</div></div>
+    <div class="sla-stat"><div class="sla-stat-v" style="color:var(--green)">${cnt.green}</div><div class="sla-stat-l">≤6h</div></div>
+    <div class="sla-stat"><div class="sla-stat-v" style="color:#3498db">${mz0Totes.length}</div><div class="sla-stat-l">Total</div></div>`;
+
+  const tbl=document.getElementById('sla-table');
+  if(!mz0Totes.length){tbl.innerHTML='<div style="color:var(--sub);font-size:.7rem;text-align:center;padding:20px">Sin totes pendientes ✓</div>';return;}
+
+  tbl.innerHTML = mz0Totes.map(r=>{
+    const sla=(r.SEMAFORO_PUTAWAY||'VERDE').toUpperCase();
+    const bucketCls=sla==='VERDE'?'green':sla==='AMARILLO'?'yellow':sla==='ROJO'?'red':'burnt';
+    const hrs=parseFloat(r.HORAS_ESPERANDO)||0;
+    const fams=(r.FAMILIAS||'—').replace(/ \| /g,' · ');
+    const dci=r.ES_DCI==='true'||r.ES_DCI===true?'<span style="color:var(--accent);font-size:.5rem">DCI</span>':'';
+    return `<div class="sla-row">
+      <span class="sla-tote">${r.TOTE_ID||'—'}</span>
+      <span class="sla-familia">${fams} ${dci}</span>
+      <span class="sla-hrs" style="color:var(--${bucketCls})">${hrs.toFixed(1)}h</span>
+      <span class="sla-badge ${bucketCls}">${sla}</span>
+    </div>`;
+  }).join('');
+}
+
+// ══ PUTAWAY TOOL ═════════════════════════════════════════
+function togglePutawayToolMode(){
+  putawayToolMode = !putawayToolMode;
+  const btn = document.getElementById('btn-putaway-tool');
+  if (putawayToolMode){
+    btn.style.background   = 'rgba(39,174,96,.25)';
+    btn.style.borderColor  = 'var(--green)';
+    btn.style.color        = 'var(--green)';
+    btn.textContent        = '✅ PUTAWAY TOOL';
+    buildPutawayToolOverlay(currentFloor);
+  } else {
+    btn.style.background   = 'rgba(0,243,255,.1)';
+    btn.style.borderColor  = 'var(--cyan)';
+    btn.style.color        = 'var(--cyan)';
+    btn.textContent        = '🗺 PUTAWAY TOOL';
+    if (putawayToolOverlayGroup){ scene.remove(putawayToolOverlayGroup); putawayToolOverlayGroup = null; }
+  }
+  renderLeftPanel();
+}
+
+function buildPutawayToolOverlay(pisoIdx){
+  if (putawayToolOverlayGroup){ scene.remove(putawayToolOverlayGroup); putawayToolOverlayGroup = null; }
+  if (!putawayToolMode) return;
+
+  putawayToolOverlayGroup = new THREE.Group();
+
+  const pisoKey = `MZ-${pisoIdx}`;
+  const rows = allPutawayTool.filter(r => String(r.PISO||'').toUpperCase() === pisoKey);
+  if (!rows.length){ scene.add(putawayToolOverlayGroup); return; }
+
+  const maxSis = Math.max(...rows.map(r => parseFloat(r.SIs_DISPONIBLES)||0)) || 1;
+
+  rows.forEach(r => {
+    const calle = parseInt(r.CALLE || r.PASILLO);
+    if (!calle || calle < 1 || calle > NUM_CALLES) return;
+    const sis    = parseFloat(r.SIs_DISPONIBLES) || 0;
+    const ratio  = sis / maxSis;
+    // Verde puro; más brillante cuanto más SIs
+    const brightness = 0.35 + ratio * 0.65;
+    const col  = new THREE.Color(0, brightness, brightness * 0.18);
+
+    const px   = (calle-1)*CALLE_STEP + RACK_W;      // inicio del pasillo
+    const pcx  = px + PASILLO_W/2;                   // centro X del pasillo
+    const opacity = 0.22 + ratio * 0.30;
+
+    // Plano verde en el suelo del pasillo
+    const pGeo = new THREE.PlaneGeometry(PASILLO_W, TOTAL_DEPTH);
+    const pMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity, depthWrite: false });
+    const plane = new THREE.Mesh(pGeo, pMat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(pcx, 0.008, TOTAL_DEPTH/2);
+    putawayToolOverlayGroup.add(plane);
+
+    // Borde neon verde
+    const borderPts = [
+      new THREE.Vector3(px,           0.012, 0),
+      new THREE.Vector3(px+PASILLO_W, 0.012, 0),
+      new THREE.Vector3(px+PASILLO_W, 0.012, TOTAL_DEPTH),
+      new THREE.Vector3(px,           0.012, TOTAL_DEPTH),
+      new THREE.Vector3(px,           0.012, 0)
+    ];
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x27ae60, transparent: true, opacity: 0.75 });
+    putawayToolOverlayGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(borderPts), lineMat));
+  });
+
+  scene.add(putawayToolOverlayGroup);
+}
+
+// Hacer clic en un pasillo del panel izquierdo mueve la cámara allí
+function focusCalle(calle){
+  const clampedCalle = Math.max(1, Math.min(NUM_CALLES, calle));
+  cameraXTarget = (clampedCalle-1)*CALLE_STEP + RACK_W + PASILLO_W/2;
+}
+
+// ══ INIT Y REFRESH ═══════════════════════════════════════
+async function loadAndRender(){
+  try {
+    document.getElementById('loading-txt').textContent='Cargando datos...';
+    // Cargar todos los datasets en paralelo; picking puede fallar sin romper todo
+    const [repsRows, totesRows, binfullRows, pickingRepsRows, zptsRows, pickDetailRows, putawayToolRows] = await Promise.all([
+      loadDataset(DATASET_REPS),
+      loadDataset(DATASET_TOTES),
+      loadDataset(DATASET_BINFULL),
+      loadDataset(DATASET_PICKING_REPS).catch(() => []),
+      loadDataset(DATASET_ZPTS).catch(() => []),
+      loadDataset(DATASET_PICKING_DETAIL).catch(() => []),
+      loadDataset(DATASET_PUTAWAY_TOOL).catch(() => [])
+    ]);
+
+    allReps        = repsRows        || [];
+    allTotes       = totesRows       || [];
+    allBinfull     = binfullRows     || [];
+    allPickingReps   = pickingRepsRows || [];
+    allPickingDetail = pickDetailRows  || [];
+    allZPTs          = zptsRows        || [];
+    allPutawayTool   = putawayToolRows || [];
+
+    repsMap    = processReps(allReps);
+    zoneStats  = processTotes(allTotes);
+    binfullMap = processBinfull(allBinfull);
+
+    // Dedup por PICKER_ID — garantiza 1 fila por picker sin importar lo que mande el servidor
+    const pickDedupMap = new Map();
+    allPickingReps.forEach(r => {
+      const key = String(r.PICKER_ID || r.PICKER_USER_ID || r.PICKER_LDAP || '');
+      if (!key) return;
+      const existing = pickDedupMap.get(key);
+      const mins = parseInt(r.MINUTOS_DESDE_ULTIMO_MOV ?? 9999);
+      if (!existing || mins < parseInt(existing.MINUTOS_DESDE_ULTIMO_MOV ?? 9999)) {
+        pickDedupMap.set(key, r);
+      }
+    });
+    allPickingReps = Array.from(pickDedupMap.values());
+
+    allPickingReps.forEach(r => {
+      // Normalizar campos: la query nueva usa PICKER_ID (string) y FECHA_ULTIMO_EVENTO
+      r.PICKER_USER_ID = r.PICKER_USER_ID || r.PICKER_ID;
+      r.PICKER_LDAP    = r.PICKER_LDAP || r.PICKER_ID; // display fallback
+      r.OPERARIO_LDAP  = r.PICKER_LDAP;
+      r.MINUTOS_DESDE_ULTIMO_MOV = r.MINUTOS_DESDE_ULTIMO_MOV ?? r.MIN_DESDE_ULTIMO;
+      // Parsear ubicación — PISO/CALLE/AREA vienen como columnas separadas en la query nueva
+      const pos = parseUbicacion(r);
+      r._piso = pos.piso; r._calle = pos.calle; r._modulo = pos.modulo; r._zona = pos.zona;
+    });
+
+    console.log(`[REPS] ${allReps.length} putaway, ${allPickingReps.length} picking, ${allZPTs.length} ZPTs`);
+    console.log(`[BINFULL] ${binfullMap.size} calles`);
+    if (allReps.length > 0) {
+      const s = allReps[0];
+      console.log('[REPS] sample:', s, '→ piso:', s._piso, 'calle:', s._calle);
+    }
+
+    buildFloor(currentFloor);
+    if (putawayToolMode) buildPutawayToolOverlay(currentFloor);
+    renderLeftPanel(); // actualizar panel izquierdo con data fresca
+  } catch(e){
+    console.error('Error cargando datos:', e);
+  } finally {
+    document.getElementById('loading-overlay').style.display='none';
+  }
+}
+
+async function init(){
+  await loadAndRender();
+  animate();
+  setInterval(async ()=>{
+    await loadAndRender();
+  }, REFRESH_MS);
+}
+
+init();
+</script>
+
+
+
+
+
+
+</body>
+</html>
