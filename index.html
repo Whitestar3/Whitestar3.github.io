@@ -30,6 +30,9 @@
   .btn.primary{background:var(--accent);color:#14171f;border-color:var(--accent)}
   .btn.primary:hover{filter:brightness(1.05);color:#14171f}
 
+  .hero{display:grid;grid-template-columns:1fr 260px;gap:48px;align-items:center}
+  .avatar{width:260px;height:260px;border-radius:50%;object-fit:cover;border:5px solid var(--accent);box-shadow:0 0 0 10px rgba(255,216,77,.08),0 20px 50px rgba(0,0,0,.45)}
+  @media (max-width:820px){.hero{grid-template-columns:1fr}.avatar{width:170px;height:170px;order:-1}}
   section{padding:64px 0;border-bottom:1px solid var(--line)}
   h2{font-size:26px;margin-bottom:8px}
   .sub{color:var(--muted);margin-bottom:34px}
@@ -60,7 +63,8 @@
 <body>
 
 <header>
-  <div class="wrap">
+  <div class="wrap hero">
+    <div class="hero-text">
     <div class="tag">Portafolio · Operaciones logísticas &amp; datos</div>
     <h1>Hola, soy <span>Julio</span>. Mi trabajo es convertir tus datos en decisiones que mejoran la eficiencia y la eficacia operativa.</h1>
     <p class="lead"><strong>No construyo paneles bonitos: construyo visuales para tomar decisiones reales</strong>, con criterio y foco en la mejora de procesos.</p>
@@ -71,6 +75,8 @@
       <a class="btn" href="https://www.linkedin.com/in/julio-novoa/" target="_blank" rel="noopener">LinkedIn</a>
       <a class="btn" href="mailto:julio.novoa.jeria@gmail.com">Contacto</a>
     </div>
+    </div>
+    <img class="avatar" src="img/julio.jpg" alt="Julio Novoa">
   </div>
 </header>
 
