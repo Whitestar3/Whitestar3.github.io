@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<!--
+  © 2026 Julio Novoa. Todos los derechos reservados.
+  Prohibida su copia, reproducción o uso total o parcial sin autorización del autor.
+  https://www.linkedin.com/in/julio-novoa/
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Julio Novoa · La aventura de los datos</title>
+<meta name="author" content="Julio Novoa">
+<meta name="description" content="Conoce el trabajo de Julio Novoa como un videojuego: niveles, proyectos y contacto.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{--y:#ffd84d;--g:#4fd1a5;--bg:#0b1020;--panel:#141b2e;--line:#2a3656;--text:#eef1f7;--mut:#9aa5bd}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Press Start 2P',ui-monospace,monospace;-webkit-user-select:none;user-select:none;touch-action:none}
+  canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated;cursor:pointer}
+  .px{font-family:'Press Start 2P',ui-monospace,monospace}
+
+  /* HUD */
+  #hud{position:fixed;top:12px;left:12px;right:12px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;pointer-events:none;z-index:5}
+  .hbox{background:rgba(11,16,32,.82);border:3px solid var(--line);box-shadow:0 0 0 3px #000;padding:10px 12px;font-size:10px;line-height:1.7;pointer-events:auto}
+  .hbox b{color:var(--y)}
+  #menu{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .mbtn{font:10px 'Press Start 2P',monospace;color:var(--text);background:#1b2440;border:3px solid var(--line);box-shadow:0 0 0 3px #000,inset 0 -4px 0 rgba(0,0,0,.35);padding:10px 12px;cursor:pointer;pointer-events:auto}
+  .mbtn:hover{border-color:var(--y);color:var(--y)}
+  .mbtn:active{transform:translateY(2px)}
+
+  /* Dialog */
+  #dlg{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);width:min(760px,calc(100vw - 24px));background:rgba(11,16,32,.94);border:4px solid var(--text);box-shadow:0 0 0 4px #000,0 12px 40px rgba(0,0,0,.6);padding:16px 18px 14px;z-index:6;display:none}
+  #dlg h3{font-size:11px;color:var(--y);margin-bottom:10px;letter-spacing:1px}
+  #dlg p{font-size:10px;line-height:1.9;color:var(--text);min-height:38px}
+  #dlg .row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:12px}
+  #dlg .hint{font-size:8px;color:var(--mut)}
+  #dlg a.go,#dlg button.go{font:10px 'Press Start 2P',monospace;color:#111;background:var(--y);border:3px solid #000;padding:10px 12px;text-decoration:none;cursor:pointer;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  #dlg .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  #dlg .chip{font-size:8px;padding:5px 7px;border:2px solid var(--line);color:#c6cfe2}
+  .blink{animation:bl 1s steps(2) infinite}@keyframes bl{50%{opacity:0}}
+
+  /* Touch controls */
+  #pad{position:fixed;bottom:18px;left:14px;right:14px;display:none;justify-content:space-between;z-index:4;pointer-events:none}
+  #pad .grp{display:flex;gap:12px;pointer-events:auto}
+  #pad button{width:64px;height:64px;font:16px 'Press Start 2P',monospace;color:var(--text);background:rgba(27,36,64,.8);border:3px solid var(--line);box-shadow:0 0 0 3px #000;touch-action:none}
+  #pad button:active{background:var(--y);color:#111}
+  body.touch #pad{display:flex}
+  body.touch #dlg{bottom:auto;top:92px}
+
+  /* Intro */
+  #intro{position:fixed;inset:0;z-index:10;background:radial-gradient(ellipse at center,#18213a 0%,#0b1020 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center;padding:20px}
+  #intro h1{font-size:clamp(18px,4vw,38px);line-height:1.5;color:var(--text);text-shadow:4px 4px 0 #000}
+  #intro h1 span{color:var(--y)}
+  #intro p{font-size:clamp(9px,1.4vw,12px);color:var(--mut);line-height:2;max-width:640px}
+  #intro .start{font:14px 'Press Start 2P',monospace;color:#111;background:var(--y);border:4px solid #000;padding:16px 22px;cursor:pointer;box-shadow:0 6px 0 #a88a1d}
+  #intro .start:active{transform:translateY(4px);box-shadow:0 2px 0 #a88a1d}
+  #intro .keys{font-size:9px;color:var(--mut);line-height:2.2}
+  #intro .keys b{color:var(--text);border:2px solid var(--line);padding:2px 6px;margin:0 2px}
+  #intro a{color:var(--g);font-size:9px}
+  #copy{position:fixed;bottom:4px;right:8px;font:8px 'Press Start 2P',monospace;color:rgba(154,165,189,.6);z-index:3;pointer-events:none}
+  @media (max-width:640px){.hbox{font-size:8px;padding:7px 8px}.mbtn{font-size:8px;padding:8px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hbox"><b>JULIO NOVOA</b><br><span id="lvl">INICIO</span><br>DATOS ◆ <span id="coins">0</span>/<span id="ctot">0</span></div>
+  <div id="menu">
+    <button class="mbtn" data-go="github">GITHUB</button>
+    <button class="mbtn" data-go="linkedin">LINKEDIN</button>
+    <button class="mbtn" data-go="gmail">GMAIL</button>
+    <button class="mbtn" id="snd" title="Sonido">♪ OFF</button>
+  </div>
+</div>
+
+<div id="dlg"><h3 id="dlgT"></h3><p id="dlgP"></p><div id="dlgX"></div><div class="row"><span class="hint">ENTER / CLIC PARA CERRAR</span><span id="dlgA"></span></div></div>
+
+<div id="pad">
+  <div class="grp"><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <div class="grp"><button data-k="up">⤒</button><button data-k="jump">A</button></div>
+</div>
+
+<div id="intro">
+  <h1>LA AVENTURA<br>DE LOS <span>DATOS</span></h1>
+  <p>Acompaña a Julio por la operación de un centro de distribución y descubre cómo convierte datos en decisiones.</p>
+  <button class="start" id="start">▶ JUGAR</button>
+  <div class="keys"><b>◀ ▶</b> caminar &nbsp; <b>ESPACIO</b> saltar &nbsp; <b>▲</b> entrar<br>o haz <b>CLIC</b> donde quieras ir</div>
+  <a href="../">← volver al portafolio clásico</a>
+</div>
+<div id="copy">© 2026 JULIO NOVOA</div>
+
+<script>
+(function(){
+"use strict";
+// ═══════════════════════════════ CONFIG ═══════════════════════════════
+const LINKS = {
+  github:   'https://github.com/Whitestar3',
+  linkedin: 'https://www.linkedin.com/in/julio-novoa/',
+  gmail:    'https://mail.google.com/mail/?view=cm&fs=1&to=julio.novoa.jeria@gmail.com&su=Hola%20Julio',
+  portfolio:'../'
+};
+const H = 200;            // altura lógica del mundo
+const GROUND = 168;       // y del suelo
+const WORLD_W = 4300;
+
+// ═══════════════════════════════ SPRITES ═══════════════════════════════
+const PAL = { H:'#1b1410', h:'#3a2a20', S:'#e0a982', s:'#b9805f', E:'#111111', B:'#2a1d16', W:'#f3f3f3',
+              T:'#8a2232', J:'#3b414b', j:'#2a2f37', P:'#262a31', K:'#0d0d0d', M:'#8a5a45' };
+const TOP = [
+  "....HHHHHHH.....",
+  "...HHhHHHhHH....",
+  "..HHHHHHHHHHH...",
+  "..HHSSSSSSSHH...",
+  "..HSSSSSSSSSH...",
+  "..HSEESSSEESH...",
+  "...SSSSsSSSS....",
+  "...BSSSSSSSB....",
+  "...BBBMMMBBB....",
+  "....BBBBBBB.....",
+  ".....BBBBB......",
+  "....JJWTWJJ.....",
+  "...JJJWTWJJJ....",
+  "..JJJJWTWJJJJ...",
+  "..JJJJWTWJJJJ...",
+  "..JJJJJTJJJJJ...",
+  "..SJJJJJJJJJS...",
+  "...jjjjjjjjj...."
+];
+const LEGS = {
+  idle:["...PPPP.PPPP....","...PPPP.PPPP....","...PPP...PPP....","..KKKK...KKKK..."],
+  w1:  ["...PPPP.PPPP....","..PPPP...PPPP...","..PPP.....PPP...",".KKKK.....KKKK.."],
+  w2:  ["....PPPPPPP.....",".....PPPPP......",".....PPPPP......","....KKKKKKK....."],
+  jump:["...PPPP.PPPP....","..PPPP..PPPP....",".KKKK....KKKK...","................"]
+};
+function buildSprite(legs){
+  const rows = TOP.concat(legs);
+  const c = document.createElement('canvas'); c.width = 16; c.height = rows.length;
+  const x = c.getContext('2d');
+  rows.forEach((r,y)=>{ for(let i=0;i<16;i++){ const ch=r[i]; if(ch && ch!=='.' && PAL[ch]){ x.fillStyle=PAL[ch]; x.fillRect(i,y,1,1);} } });
+  return c;
+}
+const SPR = { idle:buildSprite(LEGS.idle), w1:buildSprite(LEGS.w1), w2:buildSprite(LEGS.w2), jump:buildSprite(LEGS.jump) };
+const PW = 12, PHh = 22;  // caja de colisión del jugador
+
+// ═══════════════════════════════ WORLD ═══════════════════════════════
+const signs = [
+  { x:90,   w:150, t:['¡HOLA! SOY JULIO','Camina → para','conocer mi trabajo'] },
+];
+const levels = [
+  { x:520,  name:'NIVEL 1 · LA OPERACIÓN', title:'NIVEL 1 · LA OPERACIÓN',
+    text:'Trabajo en la operación inbound de un centro de distribución: recepción, chequeo y guardado de cientos de miles de unidades al día. Ahí cada hora cuenta, y cada decisión mueve a decenas de personas.' },
+  { x:1050, name:'NIVEL 2 · EL PROBLEMA', title:'NIVEL 2 · EL PROBLEMA',
+    text:'Los datos estaban, pero llegaban tarde y en reportes hechos a mano. Las decisiones se tomaban con el retrovisor: mirando lo que ya había pasado.' },
+  { x:1600, name:'NIVEL 3 · LAS HERRAMIENTAS', title:'NIVEL 3 · LAS HERRAMIENTAS',
+    text:'Así que construí mis propias herramientas: consultas en BigQuery, automatizaciones en n8n y visuales en el navegador. ¡Golpea las cajas ▣ desde abajo para ver cada proyecto!' },
+  { x:3000, name:'NIVEL 4 · EL IMPACTO', title:'NIVEL 4 · EL IMPACTO',
+    text:'KPIs hora a hora en vez de al día siguiente. Umbrales de volumetría que explican caídas de productividad de 12–20%. Un monitor de temporada alta con ahorro estimado de ~USD 1.000 al mes.' },
+  { x:3450, name:'NIVEL FINAL · HABLEMOS', title:'NIVEL FINAL · HABLEMOS',
+    text:'No construyo paneles bonitos: construyo visuales para tomar decisiones reales. Si quieres conversar, elige una puerta y entra con ▲.' }
+];
+const projects = [
+  { x:1820, icon:'D', color:'#4fd1a5', title:'DAILY DE UNA PÁGINA',
+    text:'Todos los KPIs de la operación en un solo lugar: 16 indicadores día a día contra el target, con semáforo. 8 consultas que corren solas cada mañana.',
+    chips:['BigQuery','n8n','JavaScript','Tailwind'], url:'../demos/daily/' },
+  { x:2100, icon:'3D', color:'#b060f0', title:'SKYNET 360 · GEMELO DIGITAL',
+    text:'El centro de distribución completo en 3D: stage, check-in, mezanina y packing, con reps, pallets y totes en tiempo real.',
+    chips:['Three.js','JavaScript','n8n'], url:'../demos/skynet-360/' },
+  { x:2380, icon:'P', color:'#f59e0b', title:'PEAK SEASON · HORA A HORA',
+    text:'Monitor de temporada alta: volumen, peso, totes, binfullness y composición del personal (NH1 → Nativo) en Guardado, Chequeado y Recepción Rápida.',
+    chips:['BigQuery','n8n','Chart.js'], url:'../demos/peak-season/' },
+  { x:2660, icon:'V', color:'#6ea8ff', title:'VOLUMETRÍA POR ÁREA',
+    text:'Litros por unidad en cada área y el umbral desde el cual el volumen empieza a bajar la productividad.',
+    chips:['BigQuery','n8n','Chart.js'], url:'../demos/volumetria/' }
+];
+const doors = [
+  { key:'github',   x:3650, label:'GITHUB',   sub:'código y perfil', color:'#24292f', accent:'#e8ecf4', url:LINKS.github },
+  { key:'linkedin', x:3850, label:'LINKEDIN', sub:'experiencia',     color:'#0a66c2', accent:'#ffffff', url:LINKS.linkedin },
+  { key:'gmail',    x:4050, label:'GMAIL',    sub:'escríbeme',       color:'#c5221f', accent:'#ffffff', url:LINKS.gmail }
+];
+// Cajas de proyecto (sólidas, se golpean desde abajo)
+const blocks = projects.map(p => ({ x:p.x, y:GROUND-66, w:18, h:18, p, bump:0, hit:false }));
+// Plataformas (se puede pararse encima, se atraviesan desde abajo)
+const plats = [
+  {x:760,y:GROUND-40,w:70},{x:880,y:GROUND-70,w:70},{x:1000,y:GROUND-100,w:90},
+  {x:1250,y:GROUND-45,w:60},{x:1340,y:GROUND-80,w:80},
+  {x:2850,y:GROUND-50,w:80},{x:3150,y:GROUND-45,w:70},{x:3250,y:GROUND-80,w:70}
+];
+// Monedas de datos
+const coins = [];
+function addCoins(x0,y,n,dx){ for(let i=0;i<n;i++) coins.push({x:x0+i*dx,y,got:false}); }
+addCoins(300,GROUND-14,5,22); addCoins(770,GROUND-54,3,22); addCoins(890,GROUND-84,3,22); addCoins(1010,GROUND-114,4,22);
+addCoins(1260,GROUND-59,2,22); addCoins(1350,GROUND-94,3,22); addCoins(1950,GROUND-14,3,24); addCoins(2230,GROUND-14,3,24);
+addCoins(2510,GROUND-14,3,24); addCoins(2860,GROUND-64,3,22); addCoins(3260,GROUND-94,3,22);
+document.getElementById('ctot').textContent = coins.length;
+
+// ═══════════════════════════════ STATE ═══════════════════════════════
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let S = 3, VW = 400, VH = 200, OFFY = 0, camX = 0;
+const P = { x:40, y:GROUND-PHh, vx:0, vy:0, onGround:true, face:1, anim:0 };
+const keys = { left:false, right:false, jump:false, up:false };
+let auto = null;           // {x, then:fn}
+let started = false, got = 0, seenLevel = {}, curLevel = 'INICIO', nearDoor = null;
+let dlgOpen = false, dlgOnClose = null, typeT = null;
+let sound = false, actx = null;
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  cv.width = Math.floor(innerWidth*dpr); cv.height = Math.floor(innerHeight*dpr);
+  S = Math.min(cv.height / H, cv.width / 230); VW = cv.width / S; VH = cv.height / S;
+  OFFY = Math.max(0, Math.min(VH - H, VH*0.70 - GROUND));
+  ctx.imageSmoothingEnabled = false;
+}
+addEventListener('resize', resize); resize();
+if (matchMedia('(pointer:coarse)').matches) document.body.classList.add('touch');
+
+// ═══════════════════════════════ SOUND ═══════════════════════════════
+function beep(f, d, type){
+  if(!sound) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type||'square'; o.frequency.value = f; g.gain.value = .05;
+    o.connect(g); g.connect(actx.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + d); o.stop(actx.currentTime + d);
+  }catch(e){}
+}
+document.getElementById('snd').onclick = e => { sound = !sound; e.target.textContent = sound ? '♪ ON' : '♪ OFF'; beep(660,.08); };
+
+// ═══════════════════════════════ DIALOG ═══════════════════════════════
+const dlg = document.getElementById('dlg');
+function showDlg(title, text, opts){
+  opts = opts || {};
+  document.getElementById('dlgT').textContent = title;
+  const p = document.getElementById('dlgP'); p.textContent = '';
+  const xd = document.getElementById('dlgX'); xd.innerHTML = '';
+  if(opts.chips){ const c = document.createElement('div'); c.className='chips'; opts.chips.forEach(t=>{ const s=document.createElement('span'); s.className='chip'; s.textContent=t; c.appendChild(s); }); xd.appendChild(c); }
+  const a = document.getElementById('dlgA'); a.innerHTML = '';
+  if(opts.link){ const l = document.createElement('a'); l.className='go'; l.href = opts.link; l.target='_blank'; l.rel='noopener'; l.textContent = opts.linkText || 'ABRIR ▶'; l.addEventListener('click', e=>e.stopPropagation()); a.appendChild(l); }
+  dlg.style.display = 'block'; dlgOpen = true; dlgOnClose = opts.onClose || null;
+  clearInterval(typeT); let i = 0;
+  typeT = setInterval(()=>{ p.textContent = text.slice(0, ++i); if(i%3===0) beep(880,.02); if(i>=text.length) clearInterval(typeT); }, 18);
+  p.dataset.full = text;
+}
+function closeDlg(){
+  const p = document.getElementById('dlgP');
+  if(p.textContent.length < (p.dataset.full||'').length){ clearInterval(typeT); p.textContent = p.dataset.full; return; }
+  dlg.style.display = 'none'; dlgOpen = false; const f = dlgOnClose; dlgOnClose = null; if(f) f();
+}
+dlg.addEventListener('click', closeDlg);
+
+// ═══════════════════════════════ INPUT ═══════════════════════════════
+const KMAP = { ArrowLeft:'left', a:'left', A:'left', ArrowRight:'right', d:'right', D:'right',
+               ' ':'jump', w:'up', W:'up', ArrowUp:'up', e:'up', E:'up' };
+addEventListener('keydown', e => {
+  if(!started){ if(e.key==='Enter'||e.key===' '){ start(); e.preventDefault(); } return; }
+  if(e.key==='Enter'){ if(dlgOpen) closeDlg(); else if(nearDoor) enterDoor(nearDoor); e.preventDefault(); return; }
+  if(e.key==='Escape' && dlgOpen){ closeDlg(); return; }
+  const k = KMAP[e.key]; if(!k) return;
+  e.preventDefault(); auto = null;
+  if(k==='jump'){ if(!keys.jump) jump(); keys.jump = true; }
+  else if(k==='up'){ if(nearDoor) enterDoor(nearDoor); else if(!keys.up) jump(); keys.up = true; }
+  else keys[k] = true;
+});
+addEventListener('keyup', e => { const k = KMAP[e.key]; if(k) keys[k] = false; });
+document.querySelectorAll('#pad button').forEach(b => {
+  const k = b.dataset.k;
+  const on = e => { e.preventDefault(); auto = null; if(k==='jump'){ jump(); } else if(k==='up'){ if(nearDoor) enterDoor(nearDoor); else jump(); } else keys[k] = true; };
+  const off = e => { e.preventDefault(); if(k!=='jump' && k!=='up') keys[k] = false; };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+});
+// Clic en el mundo: caminar hasta ahí (y golpear / entrar si es un objeto)
+cv.addEventListener('pointerdown', e => {
+  if(!started) return;
+  if(dlgOpen){ closeDlg(); return; }
+  const r = cv.getBoundingClientRect();
+  const wx = camX + (e.clientX - r.left) / r.width * VW;
+  const wy = (e.clientY - r.top) / r.height * VH - OFFY;
+  const d = doors.find(d => wx >= d.x-4 && wx <= d.x+48 && wy > GROUND-80);
+  if(d){ goToDoor(d.key); return; }
+  const b = blocks.find(b => wx >= b.x-10 && wx <= b.x+b.w+10 && wy >= b.y-14 && wy <= b.y+b.h+30);
+  if(b){ auto = { x: b.x + b.w/2 - PW/2, then: () => jump() }; return; }
+  auto = { x: wx - PW/2, fast: Math.abs(wx-P.x) > 400, v: Math.abs(wx-P.x)/90 };
+});
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); if(!started) start(); goToDoor(b.dataset.go); }));
+function goToDoor(key){
+  const d = doors.find(d => d.key === key);
+  if(dlgOpen){ dlg.style.display='none'; dlgOpen=false; dlgOnClose=null; }
+  const dist = Math.abs(P.x - d.x);
+  auto = { x: d.x + 18 - PW/2, then: () => enterDoor(d), fast: dist > 300, v: dist / 100 };
+}
+function enterDoor(d){
+  beep(523,.08); setTimeout(()=>beep(784,.12),90);
+  showDlg('PUERTA · ' + d.label, d.key==='github' ? 'Aquí está mi perfil de GitHub, con mis repositorios y este portafolio.'
+    : d.key==='linkedin' ? 'Mi experiencia, trayectoria y recomendaciones. ¡Conectemos!'
+    : '¿Tienes un proyecto, una consulta o quieres conversar? Escríbeme a julio.novoa.jeria@gmail.com',
+    { link: d.url, linkText: 'ENTRAR A ' + d.label + ' ▶' });
+}
+
+// ═══════════════════════════════ PHYSICS ═══════════════════════════════
+const GRAV = 0.42, SPEED = 1.9, JUMP = -7.6;
+function jump(){ if(P.onGround){ P.vy = JUMP; P.onGround = false; beep(392,.08,'triangle'); } }
+function overlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+
+function update(){
+  // movimiento
+  let dir = (keys.right?1:0) - (keys.left?1:0);
+  if(auto){
+    const dx = auto.x - P.x;
+    if(Math.abs(dx) < 0.5){ dir = 0; const f = auto.then; auto = null; if(f) f(); }
+    else dir = Math.sign(dx);
+  }
+  let sp = (auto && auto.fast) ? Math.max(SPEED*2, auto.v) : SPEED;
+  if(auto) sp = Math.min(sp, Math.abs(auto.x - P.x));
+  P.vx = dir * sp; if(dir) P.face = dir;
+
+  // eje X
+  P.x += P.vx;
+  P.x = Math.max(0, Math.min(WORLD_W - PW, P.x));
+  let box = {x:P.x, y:P.y, w:PW, h:PHh};
+  blocks.forEach(b => { if(overlap(box,b)){ if(P.vx>0) P.x = b.x - PW; else if(P.vx<0) P.x = b.x + b.w; box.x = P.x; } });
+
+  // eje Y
+  const prevBottom = P.y + PHh;
+  P.vy = Math.min(P.vy + GRAV, 9);
+  P.y += P.vy; P.onGround = false;
+  box = {x:P.x, y:P.y, w:PW, h:PHh};
+  blocks.forEach(b => {
+    if(!overlap(box,b)) return;
+    if(P.vy > 0 && prevBottom <= b.y + 1){ P.y = b.y - PHh; P.vy = 0; P.onGround = true; }
+    else if(P.vy < 0){ P.y = b.y + b.h; P.vy = 1; hitBlock(b); }
+    box.y = P.y;
+  });
+  if(P.vy >= 0) plats.forEach(pl => {
+    if(P.x + PW > pl.x && P.x < pl.x + pl.w && prevBottom <= pl.y + 1 && P.y + PHh >= pl.y){ P.y = pl.y - PHh; P.vy = 0; P.onGround = true; }
+  });
+  if(P.y + PHh >= GROUND){ P.y = GROUND - PHh; P.vy = 0; P.onGround = true; }
+
+  // animación
+  P.anim += Math.abs(P.vx) > 0 ? 0.18 * (Math.abs(P.vx)/SPEED) : 0;
+  blocks.forEach(b => { if(b.bump > 0) b.bump -= 1; });
+
+  // monedas
+  coins.forEach(c => { if(!c.got && Math.abs(P.x+PW/2 - c.x) < 10 && Math.abs(P.y+PHh/2 - c.y) < 16){ c.got = true; got++; document.getElementById('coins').textContent = got; beep(988,.06); setTimeout(()=>beep(1319,.08),60);
+    if(got === coins.length) setTimeout(()=>showDlg('¡INSIGHT DESBLOQUEADO!','Recolectaste todos los datos. Así se ve una buena decisión: con toda la información, a tiempo.'),300); } });
+
+  // niveles
+  const cx = P.x + PW/2;
+  levels.forEach(l => {
+    if(cx >= l.x){ if(curLevel !== l.name){ /* avanza */ } }
+    if(cx >= l.x && cx <= l.x + 40 && !seenLevel[l.name] && !auto){ seenLevel[l.name] = true; showDlg(l.title, l.text); beep(659,.1); }
+  });
+  let cl = 'INICIO'; levels.forEach(l => { if(cx >= l.x) cl = l.name; });
+  if(cl !== curLevel){ curLevel = cl; document.getElementById('lvl').textContent = cl.split(' · ')[0]; }
+
+  // puertas
+  nearDoor = doors.find(d => cx > d.x && cx < d.x + 36) || null;
+
+  // cámara
+  const target = P.x + PW/2 - VW*0.4;
+  camX += (Math.max(0, Math.min(WORLD_W - VW, target)) - camX) * 0.12;
+}
+function hitBlock(b){
+  b.bump = 8; beep(196,.1);
+  if(!b.hit){ b.hit = true; for(let i=0;i<6;i++) sparks.push({x:b.x+b.w/2, y:b.y, vx:(Math.random()-.5)*3, vy:-Math.random()*3-1, t:30}); }
+  const p = b.p;
+  showDlg(p.title, p.text, { chips:p.chips, link:p.url, linkText:'VER DEMO ▶' });
+}
+const sparks = [];
+
+// ═══════════════════════════════ RENDER ═══════════════════════════════
+const fr = v => v - Math.floor(v);
+const stars = Array.from({length:110}, (_,i) => ({ x: fr(Math.sin(i*12.9898)*43758.5453), y: fr(Math.sin(i*78.233)*24634.6345)*0.55, s: (i%3)+1 }));
+function px(x,y,w,h,c){ ctx.fillStyle = c; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); }
+function text(t,x,y,size,color,align){ ctx.font = size+'px "Press Start 2P", monospace'; ctx.fillStyle = color; ctx.textAlign = align||'left'; ctx.textBaseline='top'; ctx.fillText(t,x,y); }
+
+function draw(time){
+  ctx.setTransform(S,0,0,S,0,0);
+  // cielo
+  const g = ctx.createLinearGradient(0,0,0,VH); g.addColorStop(0,'#0a0f22'); g.addColorStop(.7,'#18213d'); g.addColorStop(1,'#1d2746');
+  ctx.fillStyle = g; ctx.fillRect(0,0,VW,VH);
+  ctx.translate(0, OFFY);
+  stars.forEach((s,i) => { const x = ((s.x*VW*2 - camX*0.05) % (VW+10) + VW+10) % (VW+10); const tw = (Math.sin(time/500 + i) + 1)/2; px(x, s.y*VH - OFFY, s.s>2?1.5:1, s.s>2?1.5:1, `rgba(255,255,255,${.25+tw*.6})`); });
+  // luna
+  ctx.fillStyle='#f4e9c4'; ctx.beginPath(); ctx.arc(VW*0.82 - camX*0.02, 30, 12, 0, 7); ctx.fill();
+
+  // capa lejana: bodegas
+  for(let i=-1;i<40;i++){
+    const bx = i*190 - (camX*0.25 % 190), bw = 150, bh = 46 + (i*37 % 30);
+    px(bx, GROUND-bh-24, bw, bh+24, '#141c33');
+    px(bx-6, GROUND-bh-30, bw+12, 8, '#18213d');
+    for(let w=0; w<6; w++) for(let r=0; r<2; r++){ const on = ((i*7+w*3+r) % 5) !== 0; px(bx+12+w*22, GROUND-bh-14+r*14, 10, 6, on ? 'rgba(255,216,77,.35)' : 'rgba(255,255,255,.05)'); }
+  }
+  // capa media: racks
+  for(let i=-1;i<70;i++){
+    const rx = i*120 - (camX*0.55 % 120);
+    px(rx, GROUND-62, 4, 62, '#2c3a5e'); px(rx+70, GROUND-62, 4, 62, '#2c3a5e');
+    for(let l=0;l<3;l++){ const ly = GROUND-60+l*20; px(rx, ly, 74, 3, '#f59e0b');
+      for(let k=0;k<4;k++){ const cw = 10+((i+k+l)%3)*3; px(rx+6+k*16, ly-cw+1, cw, cw-1, ['#8b6a43','#a07a4c','#73583a'][(i+k+l)%3]); } }
+  }
+  ctx.save(); ctx.translate(-Math.round(camX), 0);
+
+  // suelo
+  px(camX-2, GROUND, VW+4, VH-OFFY-GROUND+2, '#2a3350');
+  for(let x = Math.floor(camX/24)*24; x < camX+VW+24; x+=24){ px(x, GROUND, 23, 2, '#3a4670'); px(x+4, GROUND+10, 12, 2, '#ffd84d'); }
+  px(camX-2, GROUND+18, VW+4, 1, '#222a44');
+
+  // carteles
+  signs.forEach(s => {
+    px(s.x+s.w/2-2, GROUND-24, 4, 24, '#5b4632');
+    px(s.x, GROUND-70, s.w, 48, '#000'); px(s.x+2, GROUND-68, s.w-4, 44, '#1b2440');
+    text(s.t[0], s.x+s.w/2, GROUND-62, 8, '#ffd84d', 'center');
+    text(s.t[1], s.x+s.w/2, GROUND-46, 6, '#e8ecf4', 'center'); text(s.t[2], s.x+s.w/2, GROUND-36, 6, '#e8ecf4', 'center');
+  });
+  // banderas de nivel
+  levels.forEach(l => {
+    const seen = seenLevel[l.name];
+    px(l.x, GROUND-64, 3, 64, '#c6cfe2');
+    const wave = Math.sin(time/200 + l.x)*1.5;
+    ctx.fillStyle = seen ? '#4fd1a5' : '#e15759';
+    ctx.beginPath(); ctx.moveTo(l.x+3, GROUND-64); ctx.lineTo(l.x+28, GROUND-57+wave); ctx.lineTo(l.x+3, GROUND-50); ctx.fill();
+    const parts = l.name.split(' · ');
+    text(parts[0], l.x+1, GROUND-84, 6, '#ffd84d', 'center');
+    text(parts[1]||'', l.x+1, GROUND-75, 5, '#e8ecf4', 'center');
+  });
+  // plataformas
+  plats.forEach(pl => { px(pl.x, pl.y, pl.w, 6, '#000'); px(pl.x+1, pl.y+1, pl.w-2, 4, '#6b5236'); for(let k=pl.x+4;k<pl.x+pl.w-4;k+=10) px(k, pl.y+1, 1, 4, '#4a3825'); px(pl.x+1,pl.y+1,pl.w-2,1,'#8c6c47'); });
+  // cajas de proyecto
+  blocks.forEach(b => {
+    const by = b.y - (b.bump>0 ? Math.sin(b.bump/8*Math.PI)*5 : 0);
+    px(b.x-1, by-1, b.w+2, b.h+2, '#000');
+    px(b.x, by, b.w, b.h, b.hit ? '#3a4670' : b.p.color);
+    px(b.x+1, by+1, b.w-2, 2, 'rgba(255,255,255,.35)');
+    px(b.x+1, by+b.h-3, b.w-2, 2, 'rgba(0,0,0,.3)');
+    text(b.p.icon, b.x+b.w/2, by+6, b.p.icon.length>1?5:7, b.hit ? '#c6cfe2' : '#111', 'center');
+    if(!b.hit){ const a = (Math.sin(time/250)+1)/2; text('▼', b.x+b.w/2, by-12+a*2, 6, '#ffd84d', 'center'); }
+    text(b.p.title.split(' · ')[0], b.x+b.w/2, GROUND+24, 5, '#9aa5bd', 'center');
+  });
+  // monedas de datos
+  coins.forEach((c,i) => { if(c.got) return; const w = Math.abs(Math.sin(time/220 + i)) * 6 + 1; const y = c.y + Math.sin(time/300+i)*1.5;
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(c.x, y-6); ctx.lineTo(c.x+w/2+1, y); ctx.lineTo(c.x, y+6); ctx.lineTo(c.x-w/2-1, y); ctx.fill();
+    ctx.fillStyle = '#4fd1a5'; ctx.beginPath(); ctx.moveTo(c.x, y-5); ctx.lineTo(c.x+w/2, y); ctx.lineTo(c.x, y+5); ctx.lineTo(c.x-w/2, y); ctx.fill(); });
+  // puertas
+  doors.forEach(d => {
+    const near = nearDoor === d;
+    px(d.x-8, GROUND-92, 52, 92, '#000'); px(d.x-6, GROUND-90, 48, 90, '#232c49');
+    px(d.x-10, GROUND-100, 56, 12, '#000'); px(d.x-8, GROUND-98, 52, 8, d.color);
+    text(d.label, d.x+18, GROUND-96, 5, d.accent, 'center');
+    px(d.x, GROUND-58, 36, 58, '#000'); px(d.x+2, GROUND-56, 32, 56, d.color);
+    px(d.x+5, GROUND-52, 26, 22, 'rgba(255,255,255,.12)'); px(d.x+5, GROUND-26, 26, 22, 'rgba(255,255,255,.08)');
+    px(d.x+28, GROUND-30, 3, 3, '#ffd84d');
+    text(d.sub, d.x+18, GROUND-74, 5, '#9aa5bd', 'center');
+    if(near){ const a = (Math.sin(time/150)+1)/2; text('▲ ENTRAR', d.x+18, GROUND-118-a*2, 6, '#ffd84d', 'center'); }
+    // luz
+    ctx.fillStyle = near ? 'rgba(255,216,77,.10)' : 'rgba(255,255,255,.03)'; ctx.fillRect(d.x-14, GROUND, 64, 8);
+  });
+  // chispas
+  for(let i=sparks.length-1;i>=0;i--){ const s = sparks[i]; s.x+=s.vx; s.y+=s.vy; s.vy+=.15; s.t--; px(s.x,s.y,2,2,'#ffd84d'); if(s.t<=0) sparks.splice(i,1); }
+  // destino del clic
+  if(auto){ const a = (Math.sin(time/120)+1)/2; px(auto.x+PW/2-3, GROUND+3, 6, 2, `rgba(255,216,77,${.4+a*.6})`); }
+
+  // jugador
+  const moving = Math.abs(P.vx) > 0.1;
+  const spr = !P.onGround ? SPR.jump : moving ? (Math.floor(P.anim) % 2 ? SPR.w1 : SPR.w2) : SPR.idle;
+  const bob = (!moving && P.onGround) ? Math.round(Math.sin(time/400)) * 0 : 0;
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(Math.round(P.x-1), GROUND+1, PW+2, 2);
+  ctx.save();
+  const sx = Math.round(P.x + PW/2), sy = Math.round(P.y) + bob;
+  ctx.translate(sx, sy); if(P.face < 0) ctx.scale(-1,1);
+  ctx.drawImage(spr, -8, 0);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════ LOOP ═══════════════════════════════
+let last = 0, acc = 0; const STEP = 1000/60;
+function loop(t){
+  if(!last) last = t; acc += Math.min(100, t - last); last = t;
+  while(acc >= STEP){ if(started) update(); acc -= STEP; }
+  draw(t); requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function start(){
+  if(started) return; started = true;
+  document.getElementById('intro').style.display = 'none';
+  setTimeout(()=>showDlg('¡HOLA! SOY JULIO', 'Mi trabajo es convertir datos en decisiones que mejoran la eficiencia y la eficacia operativa. Camina hacia la derecha y te cuento cómo lo hago. (También puedes hacer clic donde quieras ir.)'), 250);
+}
+document.getElementById('start').addEventListener('click', start);
+// Atajo: ?ir=github|linkedin|gmail
+const ir = new URLSearchParams(location.search).get('ir');
+if(ir && doors.find(d=>d.key===ir)){ start(); setTimeout(()=>{ closeDlg(); closeDlg(); goToDoor(ir); }, 400); }
+})();
+</script>
+</body>
+</html>
