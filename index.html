@@ -39,7 +39,9 @@
   .project li::before{content:"";position:absolute;left:0;top:10px;width:8px;height:8px;border-radius:2px;background:var(--accent2)}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
   .chip{font-size:12px;padding:4px 10px;border-radius:999px;background:#1f2840;color:#c6cfe2;border:1px solid var(--line)}
-  .project .links{margin-top:0}
+  .project .links{margin-top:0;align-items:center}
+  .note{font-size:13px;color:var(--muted)}
+  .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#14171f;background:var(--accent2);padding:3px 9px;border-radius:999px;margin-bottom:10px}
 
   .skills{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
   .skill{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
@@ -71,7 +73,26 @@
 <section id="proyectos">
   <div class="wrap">
     <h2>Proyectos</h2>
-    <p class="sub">Versiones públicas y anonimizadas, con datos de ejemplo. Cada una se puede abrir en vivo.</p>
+    <p class="sub">Demos anonimizadas con datos de ejemplo: se pueden abrir y usar en vivo. El código fuente es privado.</p>
+
+    <article class="project">
+      <img src="img/daily.jpg" alt="Daily de una página: reporte gerencial">
+      <div>
+        <span class="badge">Destacado</span>
+        <h3>Daily de una página · Reporte gerencial</h3>
+        <p>Todos los KPIs de la operación inbound en un solo lugar: la semana actual día a día, contra las 4 semanas anteriores y el target, con semáforo automático.</p>
+        <ul>
+          <li>16 indicadores: productividad, SLA, netas por proceso, asistencia y calidad (DPMO, contact rate)</li>
+          <li>Un solo disparo diario: 8 consultas se calculan y publican solas cada mañana</li>
+          <li>Cascada de palancas que explica qué sube o baja la productividad</li>
+        </ul>
+        <div class="chips"><span class="chip">BigQuery SQL</span><span class="chip">n8n</span><span class="chip">JavaScript</span><span class="chip">Tailwind CSS</span></div>
+        <div class="links">
+          <a class="btn primary" href="demos/daily/" target="_blank" rel="noopener">Ver demo</a>
+          <span class="note">Código privado · disponible a pedido</span>
+        </div>
+      </div>
+    </article>
 
     <article class="project">
       <img src="img/volumetria.jpg" alt="Dashboard de volumetría por área">
@@ -85,8 +106,8 @@
         </ul>
         <div class="chips"><span class="chip">BigQuery SQL</span><span class="chip">n8n</span><span class="chip">JavaScript</span><span class="chip">Chart.js</span></div>
         <div class="links">
-          <a class="btn primary" href="https://whitestar3.github.io/volumetria-por-area/dashboard/" target="_blank" rel="noopener">Ver demo</a>
-          <a class="btn" href="https://github.com/Whitestar3/volumetria-por-area" target="_blank" rel="noopener">Código</a>
+          <a class="btn primary" href="demos/volumetria/" target="_blank" rel="noopener">Ver demo</a>
+          <span class="note">Código privado · disponible a pedido</span>
         </div>
       </div>
     </article>
@@ -104,8 +125,8 @@
         </ul>
         <div class="chips"><span class="chip">BigQuery SQL</span><span class="chip">n8n</span><span class="chip">JavaScript</span><span class="chip">Chart.js</span></div>
         <div class="links">
-          <a class="btn primary" href="https://whitestar3.github.io/PEAK_SEASON/dashboard/" target="_blank" rel="noopener">Ver demo</a>
-          <a class="btn" href="https://github.com/Whitestar3/PEAK_SEASON" target="_blank" rel="noopener">Código</a>
+          <a class="btn primary" href="demos/peak-season/" target="_blank" rel="noopener">Ver demo</a>
+          <span class="note">Código privado · disponible a pedido</span>
         </div>
       </div>
     </article>
