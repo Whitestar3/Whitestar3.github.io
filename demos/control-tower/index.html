@@ -80,7 +80,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 24px 30px;color:var(--soft);font
 <nav class="side">
   <div class="brand">IB</div>
   <div class="nav" id="nav">
-    <button data-v="pmi" title="PMI · plan vs real" class="on"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button>
+    <button data-v="pmi" title="Plan del turno · plan vs real" class="on"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button>
     <button data-v="ag" title="Agendamiento y receiving"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></button>
     <button data-v="dci" title="Direct check-in"><svg viewBox="0 0 24 24"><path d="M4 12h13M13 7l5 5-5 5M21 4v16"/></svg></button>
     <button data-v="ck" title="Check-in"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 13l2 2 4-4"/></svg></button>
@@ -90,7 +90,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 24px 30px;color:var(--soft);font
 
 <div class="topnote"><span>🧪 <b>Demo de portafolio</b> · todos los datos son ficticios y se generan en tu navegador. Ningún dato pertenece a una empresa real.</span><a href="https://whitestar3.github.io/">← Volver al portafolio de Julio Novoa</a></div>
 <header>
-  <div><b id="title">PMI · plan vs real horario</b><span class="sub" id="sub"></span></div>
+  <div><b id="title">Plan del turno · plan vs real horario</b><span class="sub" id="sub"></span></div>
   <div class="hr">
     <span class="demo">DEMO</span>
     <span class="lbl">Estás viendo:</span><span class="chip">CD Demo · Santiago</span>
@@ -102,8 +102,8 @@ footer{max-width:1440px;margin:0 auto;padding:0 24px 30px;color:var(--soft);font
 
 <div class="wrap">
 
-<!-- ═══ PMI ═══ -->
-<section class="view on" id="v-pmi" data-t="PMI · plan vs real horario">
+<!-- ═══ PLAN DEL TURNO ═══ -->
+<section class="view on" id="v-pmi" data-t="Plan del turno · plan vs real horario">
   <div class="qsec">Cumplimiento del plan · solo horas cerradas</div>
   <div class="kpis k5" id="pmiK"></div>
   <div class="card"><h3>Plan vs real del día por proceso</h3><div class="d">Horas cerradas del día operativo (07:00–06:59). Las unidades pasan por varias etapas: no se suman como "total inbound".</div><div class="cb"><canvas id="cPmi"></canvas></div></div>
@@ -233,11 +233,11 @@ function render(){
   const t=x=>`${String(H-1).padStart(2,'0')}:${String(Math.min(59,k.m+x)).padStart(2,'0')}`;
   $('upd').textContent=`Última actualización n8n: Llegadas ${t(0)} · Stage ${t(9)} · Check-in ${t(9)} · Putaway ${t(1)} · DCI ${t(2)} · datos con ~1 h de desfase`;
 
-  /* PMI */
-  const P=[['Check-in',sum(closed.map(h=>D.ckReal[h])),sum(closed.map(h=>D.ckPlan[h])),'Real desde LMS check-in'],
-           ['Direct check-in',sum(closed.map(h=>D.dciReal[h])),sum(closed.map(h=>D.dciPlan[h])),'Plan PMI de DCI'],
+  /* Plan del turno */
+  const P=[['Check-in',sum(closed.map(h=>D.ckReal[h])),sum(closed.map(h=>D.ckPlan[h])),'Real del sistema de check-in'],
+           ['Direct check-in',sum(closed.map(h=>D.dciReal[h])),sum(closed.map(h=>D.dciPlan[h])),'Plan del turno de DCI'],
            ['Putaway (toteable + no toteable)',sum(closed.map(h=>D.paReal[h])),sum(closed.map(h=>D.paPlan[h])),'Incluye todas las áreas'],
-           ['No toteable HS + RK',sum(closed.map(h=>D.ntReal[h])),sum(closed.map(h=>D.ntPlan[h])),'Excluye BL']];
+           ['No toteable HS + RK',sum(closed.map(h=>D.ntReal[h])),sum(closed.map(h=>D.ntPlan[h])),'Excluye cabeceras']];
   $('pmiK').innerHTML=kpi('Lectura del total','<span style="font-size:19px">Comparar por proceso</span>','Las unidades pasan por varias etapas; sumarlas como "total inbound" las cuenta más de una vez.')+
     P.map(([n,r,p,s])=>{const q=pct(r,p);return kpi(n,`<span class="${cls(q)}">${q}%</span>`,`${fmt(r)} real / ${fmt(p)} plan · ${closed.length} h cerradas<br>${s}`,'bord-'+(cls(q)=='ok'?'ok':cls(q)=='wa'?'war':'bad'));}).join('');
   chart('cPmi',{data:{labels:P.map(x=>x[0]),datasets:[bar('Plan (horas cerradas)',P.map(x=>x[2]),C.plan),bar('Real',P.map(x=>x[1]),[C.blue,C.green,C.amber,C.purple])]},plugins:{vl:{on:1},legend:{position:'bottom'}}});
@@ -253,7 +253,7 @@ function render(){
     kpi('Backlog recepción',fk(blNow)+' u.',`pico proyectado ${fk(pk)} a las ${pkH} h${D.blProj[23]>5000?' · no se vacía hoy con la capacidad actual':''}`,'warn');
   const rn=sum(D.realNor), rd=sum(D.realDci), pl=sum(D.planRe);
   $('agMini').innerHTML=`<div><div class="l">Recibido normal</div><div class="v">${fmt(rn)} u.</div><div class="s">receiving normal</div></div><div><div class="l">Recibido DCI</div><div class="v">${fmt(rd)} u.</div><div class="s">direct check-in</div></div><div><div class="l">Recibido total</div><div class="v">${fmt(rn+rd)} u.</div><div class="s">normal + DCI</div></div><div><div class="l">Agenda recibida</div><div class="v">${pct(rn+rd,sum(D.planRe.slice(0,H)))}%</div><div class="s">${fmt(rn+rd)} de ${fmt(sum(D.planRe.slice(0,H)))} u. planificadas</div></div>`;
-  chart('cRecv',{data:{labels:HL,datasets:[bar('Plan (PMI)',D.planRe,C.plan,{stack:'p'}),bar('Receiving normal',D.realNor,C.blue,{stack:'r',noLabel:1}),bar('Recibido por DCI',D.realDci,C.purple,{stack:'r',noLabel:1}),line('Total recibido (normal + DCI)',D.realTot,'#2d3446',{pointRadius:3,tension:0})]},
+  chart('cRecv',{data:{labels:HL,datasets:[bar('Plan del turno',D.planRe,C.plan,{stack:'p'}),bar('Receiving normal',D.realNor,C.blue,{stack:'r',noLabel:1}),bar('Recibido por DCI',D.realDci,C.purple,{stack:'r',noLabel:1}),line('Total recibido (normal + DCI)',D.realTot,'#2d3446',{pointRadius:3,tension:0})]},
     plugins:{vl:{on:1},now:{h:H,off:-8}},scales:{x:{stacked:true,grid:{display:false}}}});
   chart('cBl',{data:{labels:HL,datasets:[line('Backlog real',D.blReal,C.orange),line('Backlog proyectado',D.blProj,C.orange,{borderDash:[5,5],pointStyle:'rect'}),bar('Llegó',D.lleg,C.navy),bar('Recibido',D.recibido,'#6aa84f'),bar('Llegada esperada (agenda)',D.agU.map((v,h)=>h>=H?v:null),'#f6c27a')]},plugins:{vl:{on:0}}});
   const nx=Math.min(23,H+1); $('prox').innerHTML=`<h3>Próxima hora · ${nx} h</h3><div class="nh"><div><div class="v">${D.agIS[nx]}</div><div class="s">IS agendados</div></div><div><div class="v">${fk(D.agU[nx])}</div><div class="s">unidades</div></div><div><div class="v">${Math.max(0,isA-isL)} IS</div><div class="s">atrasados que se suman</div></div></div>
@@ -269,7 +269,7 @@ function render(){
   const dr=sum(D.dciReal), dp=sum(D.dciPlan.slice(0,H)), hEf=Math.round(dr/jitHours());
   function jitHours(){return 820+((k.seed%97));}
   $('dciK').innerHTML=kpi('Throughput',fmt(dr),`plan a esta hora ${fmt(dp)} · <span class="${cls(pct(dr,dp))}">${pct(dr,dp)-100>0?'+':''}${pct(dr,dp)-100}%</span>`)+kpi('Horas efectivas',fmt(hEf),'horas-persona en DCI')+kpi('Productividad efectiva',fmt(dr/hEf),'unidades por hora-persona');
-  chart('cDci',{data:{labels:HL,datasets:[bar('Plan (PMI)',D.dciPlan,C.plan),bar('Real',D.dciReal,C.blue)]},plugins:{vl:{on:1},now:{h:H,off:-8}}});
+  chart('cDci',{data:{labels:HL,datasets:[bar('Plan del turno',D.dciPlan,C.plan),bar('Real',D.dciReal,C.blue)]},plugins:{vl:{on:1},now:{h:H,off:-8}}});
   const oppPct=D.dciReal.map((v,h)=>v==null||!(v+D.oppLost[h])?null:Math.round(v/(v+D.oppLost[h]||1)*100));
   chart('cOpp',{data:{labels:HL,datasets:[bar('Por DCI',D.dciReal,C.blue,{stack:'o'}),bar('Por check-in normal (perdida)',D.oppLost,C.amber,{stack:'o'}),line('% por DCI',oppPct,C.navy,{yAxisID:'y2',tension:.3})]},
     plugins:{vl:{on:0},now:{h:H,off:-8}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#eef0fa'},ticks:{callback:v=>kk(v)}},y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}}}});
