@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Tower Inbound · Demo · Julio Novoa</title>
+<meta name="description" content="Demo de un Control Tower de operaciones inbound: agenda, recepción, check-in, direct check-in y no toteable, plan vs real hora a hora. Datos ficticios.">
+<script src="vendor/chart.umd.min.js"></script>
+<style>
+:root{--navy:#1e2360;--yellow:#FFE600;--bg:#f5f7fa;--blue:#3483fa;--ok:#00a650;--war:#b26b00;--bad:#e84040;--mut:rgba(0,0,0,.55);--soft:rgba(0,0,0,.45);--nav:#2a2a2e;--side:72px;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:rgba(0,0,0,.88);font-size:13px;padding-left:var(--side)}
+.side{position:fixed;inset:0 auto 0 0;width:var(--side);background:var(--nav);padding:10px 8px;z-index:20;box-shadow:2px 0 14px rgba(0,0,0,.15)}
+.brand{height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;color:var(--yellow);font-size:19px;font-weight:900}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav button{height:46px;border:0;border-radius:9px;background:transparent;color:#d1d5db;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav button.on{background:var(--yellow);color:var(--navy)}
+.nav svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.topnote{background:#1e2360;color:#fff;font-size:12px;padding:6px 24px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.topnote a{color:var(--yellow);font-weight:700;text-decoration:none}
+header{position:sticky;top:0;z-index:10;background:var(--yellow);min-height:56px;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 4px rgba(0,0,0,.12)}
+header b{font-size:17px;font-weight:800}
+header .sub{font-size:12px;color:rgba(0,0,0,.6);margin-left:12px}
+.hr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lbl{font-size:12px;color:rgba(0,0,0,.65)}
+.chip{background:rgba(255,255,255,.6);border-radius:4px;padding:5px 10px;font-size:11.5px;font-weight:600}
+.sel{height:28px;border:0;border-radius:4px;background:var(--navy);color:#fff;font-weight:700;font-size:12px;padding:0 10px}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:6px;padding:8px 16px;font-weight:700;font-size:12.5px;cursor:pointer}
+.demo{background:#e84040;color:#fff;border-radius:4px;padding:4px 8px;font-size:11px;font-weight:800;letter-spacing:.04em}
+.wrap{max-width:1440px;margin:0 auto;padding:20px 24px 50px}
+.view{display:none}.view.on{display:block}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.kpis.k5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.kpis.k3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kpi,.card{background:#fff;border-radius:12px;box-shadow:rgba(149,157,165,.18) 0 4px 16px}
+.kpi{padding:14px}
+.kpi .l{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--soft);font-weight:700}
+.kpi .v{font-size:26px;font-weight:800;margin-top:4px}
+.kpi .v small{font-size:15px;color:var(--soft)}
+.kpi .s{font-size:11.5px;color:rgba(0,0,0,.5);margin-top:2px;line-height:1.35}
+.kpi.warn{background:#fff8e1;box-shadow:inset 3px 0 0 #f5a623,rgba(149,157,165,.18) 0 4px 16px}
+.kpi.warn .l,.kpi.warn .v,.kpi.warn .s{color:var(--war)}
+.kpi.bord-ok{box-shadow:inset 3px 0 0 var(--ok),rgba(149,157,165,.18) 0 4px 16px}
+.kpi.bord-bad{box-shadow:inset 3px 0 0 var(--bad),rgba(149,157,165,.18) 0 4px 16px}
+.kpi.bord-war{box-shadow:inset 3px 0 0 #f5a623,rgba(149,157,165,.18) 0 4px 16px}
+.ok{color:var(--ok)!important}.bad{color:var(--bad)!important}.wa{color:var(--war)!important}
+.card{padding:16px;margin-bottom:12px}
+.card h3{margin:0 0 2px;font-size:15px;font-weight:800}
+.card .d{font-size:11.5px;color:var(--soft);margin-bottom:12px}
+.qsec{color:var(--blue);text-transform:uppercase;letter-spacing:.07em;font-size:11px;font-weight:800;margin:20px 0 8px}
+.cb{position:relative;height:300px}.cb.sm{height:250px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:12px}
+.mini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.mini div{background:#f7f8fa;border-radius:10px;padding:10px}
+.mini .l{font-size:11.5px;color:var(--mut);font-weight:700}.mini .v{font-size:20px;font-weight:800;margin-top:2px}.mini .s{font-size:10.5px;color:var(--soft)}
+.seg{display:inline-flex;border:1.5px solid rgba(0,0,0,.12);border-radius:16px;background:#fff;margin:0 6px 10px 0}
+.seg button{border:0;background:none;border-radius:14px;padding:4px 12px;font-size:11.5px;font-weight:700;color:rgba(0,0,0,.55);cursor:pointer}
+.seg button.on{background:var(--blue);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{background:#fafafa;color:var(--soft);text-align:right;padding:7px 9px;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+td{padding:6px 9px;border-bottom:1px solid #eef0fa;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td.cur,th.cur{background:#fffbea;font-weight:700}
+.tw{overflow:auto}
+.nh{display:flex;gap:22px;margin:6px 0 10px}.nh .v{font-size:20px;font-weight:800;color:var(--navy)}.nh .s{font-size:11px;color:var(--soft)}
+.mix{display:flex;height:12px;border-radius:3px;overflow:hidden}
+.mixl{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:11px;color:var(--mut)}
+.mixl i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+.al{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #eef0fa;font-size:12.5px}.al:last-child{border:0}
+.al i{width:9px;height:9px;border-radius:50%;margin-top:4px;flex:none}
+.stage{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stage div{background:#f7f8fa;border-radius:8px;padding:10px}.stage .v{font-size:20px;font-weight:800}
+.sq{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+footer{max-width:1440px;margin:0 auto;padding:0 24px 30px;color:var(--soft);font-size:12px;line-height:1.5}
+@media(max-width:1000px){.kpis,.kpis.k5,.kpis.k3,.mini{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.stage{grid-template-columns:1fr 1fr 1fr}}
+</style>
+</head>
+<body>
+<nav class="side">
+  <div class="brand">IB</div>
+  <div class="nav" id="nav">
+    <button data-v="pmi" title="PMI · plan vs real" class="on"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button>
+    <button data-v="ag" title="Agendamiento y receiving"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></button>
+    <button data-v="dci" title="Direct check-in"><svg viewBox="0 0 24 24"><path d="M4 12h13M13 7l5 5-5 5M21 4v16"/></svg></button>
+    <button data-v="ck" title="Check-in"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 13l2 2 4-4"/></svg></button>
+    <button data-v="nt" title="No toteable"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 9h2M7 17h2"/></svg></button>
+  </div>
+</nav>
+
+<div class="topnote"><span>🧪 <b>Demo de portafolio</b> · todos los datos son ficticios y se generan en tu navegador. Ningún dato pertenece a una empresa real.</span><a href="https://whitestar3.github.io/">← Volver al portafolio de Julio Novoa</a></div>
+<header>
+  <div><b id="title">PMI · plan vs real horario</b><span class="sub" id="sub"></span></div>
+  <div class="hr">
+    <span class="demo">DEMO</span>
+    <span class="lbl">Estás viendo:</span><span class="chip">CD Demo · Santiago</span>
+    <select class="sel"><option>Hoy · en vivo</option></select>
+    <span class="chip" id="upd"></span>
+    <button class="btn" id="reload">Actualizar</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ═══ PMI ═══ -->
+<section class="view on" id="v-pmi" data-t="PMI · plan vs real horario">
+  <div class="qsec">Cumplimiento del plan · solo horas cerradas</div>
+  <div class="kpis k5" id="pmiK"></div>
+  <div class="card"><h3>Plan vs real del día por proceso</h3><div class="d">Horas cerradas del día operativo (07:00–06:59). Las unidades pasan por varias etapas: no se suman como "total inbound".</div><div class="cb"><canvas id="cPmi"></canvas></div></div>
+  <div class="card"><h3>Hora a hora · cumplimiento por proceso</h3><div class="d">% real / plan de cada hora cerrada. Verde ≥ 100% · ámbar 90–99% · rojo &lt; 90%.</div><div class="tw" id="pmiT"></div></div>
+</section>
+
+<!-- ═══ AGENDA ═══ -->
+<section class="view" id="v-ag" data-t="Agendamiento y receiving">
+  <div class="kpis" id="agK"></div>
+  <div class="card"><h3>Receiving · unidades de agenda vs unidades recibidas</h3><div class="d">Plan = agenda P50 corrida 1 hora. Real separado: receiving normal y direct check-in (DCI); la línea total suma ambos para compararlo con la agenda.</div>
+    <div class="mini" id="agMini"></div><div class="cb"><canvas id="cRecv"></canvas></div></div>
+  <div class="grid2">
+    <div class="card"><h3>Hora a hora · plan, llegada y backlog</h3><div class="d">Backlog real y proyectado de recepción con la capacidad del plan.</div><div class="cb"><canvas id="cBl"></canvas></div></div>
+    <div><div class="card" id="prox"></div><div class="card"><h3>Alertas</h3><div class="d">Generadas automáticamente con reglas sobre los datos.</div><div id="alerts"></div></div></div>
+  </div>
+</section>
+
+<!-- ═══ DCI ═══ -->
+<section class="view" id="v-dci" data-t="Direct check-in">
+  <div class="kpis k3" id="dciK"></div>
+  <div class="card"><h3>Direct check-in · plan vs real</h3><div class="d">Unidades por hora procesadas por DCI contra el plan.</div><div class="cb"><canvas id="cDci"></canvas></div></div>
+  <div class="card"><h3>Uso de la oportunidad por hora</h3><div class="d">Unidades del universo DCI: azul = por DCI · ámbar = por check-in normal (oportunidad perdida). La línea es el % hecho por DCI.</div><div class="cb"><canvas id="cOpp"></canvas></div></div>
+</section>
+
+<!-- ═══ CHECK-IN ═══ -->
+<section class="view" id="v-ck" data-t="Check-in">
+  <div class="kpis" id="ckK"></div>
+  <div class="card"><h3>Backlog de stage · real y proyectado</h3><div class="d" id="ckD"></div><div class="cb"><canvas id="cCkBl"></canvas></div><div class="tw" id="ckT" style="margin-top:12px"></div></div>
+  <div class="grid2">
+    <div class="card"><h3>Check-in del día · acumulado</h3><div class="d">Planificado, procesado y lo que entró a stage.</div><div class="cb"><canvas id="cCkAc"></canvas></div></div>
+    <div class="card"><h3>Backlog de stage</h3><div class="d">Foto actual por ubicación y grupo.</div><div class="stage" id="stg"></div><div id="stgMix"></div><div class="tw" id="stgT" style="margin-top:10px"></div></div>
+  </div>
+</section>
+
+<!-- ═══ NO TOTEABLE ═══ -->
+<section class="view" id="v-nt" data-t="No toteable">
+  <div class="kpis" id="ntK"></div>
+  <div class="qsec">2 · ¿Cómo voy hora a hora?</div>
+  <div class="card"><h3>Guardado no toteable · plan vs real · 00:00 → 23:00</h3><div class="d">Barras grises = plan · barra azul = total real (HS + RK). Línea roja = hora actual.</div><div class="cb"><canvas id="cNt"></canvas></div></div>
+  <div class="card"><h3>Dotación · plan vs reales por hora</h3><div class="d">Plan del turno vs personas únicas que trabajaron en la hora.</div><div class="cb sm"><canvas id="cDot"></canvas></div></div>
+</section>
+</div>
+
+<footer>
+  <b>Cómo está construido el original:</b> flujos de <b>n8n</b> programados (cada 20 min / cada hora) ejecutan consultas <b>SQL en BigQuery</b> y leen el plan desde <b>Google Sheets</b>; publican datasets que esta interfaz en <b>HTML + JavaScript + Chart.js</b> consume para mostrar plan vs real, backlog proyectado y alertas. Esta versión pública reemplaza las fuentes por un generador de datos simulados.<br>
+  Diseño y desarrollo: <b>Julio Novoa Jeria</b> · <a href="https://whitestar3.github.io/">whitestar3.github.io</a>
+</footer>
+
+<script>
+/* ───────── utilidades ───────── */
+const $=id=>document.getElementById(id);
+const H24=[...Array(24).keys()], HL=H24.map(h=>String(h).padStart(2,'0')+' h');
+const fmt=n=>n==null?'—':Math.round(n).toLocaleString('es-CL');
+const fk=n=>n==null?'':Math.abs(n)>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M':Math.abs(n)>=1000?(n/1000).toFixed(1).replace('.',',')+' mil':String(Math.round(n));
+const kk=n=>Math.abs(n)>=1000?(n/1000).toFixed(1)+'k':String(Math.round(n));
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+const sum=a=>a.reduce((s,x)=>s+(x||0),0);
+const cls=p=>p>=100?'ok':p>=90?'wa':'bad';
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const C={plan:'#c9cbd9',blue:'#3483fa',navy:'#1e2360',purple:'#7b1fa2',green:'#00a650',amber:'#f39c12',orange:'#e3633a',red:'#e84040'};
+
+/* ───────── reloj de la demo (hora de Santiago, acotada a un turno con actividad) ───────── */
+function clock(){
+  const p=Object.fromEntries(new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+  let h=+p.hour, m=+p.minute; if(h<10||h>21){h=15;m=12;}
+  return {h,m,day:`${p.day}/${p.month}`,seed:+(p.year+p.month+p.day)};
+}
+
+/* ───────── generador de datos simulados ───────── */
+function gen(){
+  const k=clock(), r=rng(k.seed), H=k.h, jit=(a,b)=>a+(b-a)*r();
+  const shapeArr=[0,0,0,0,0,0,.15,.45,.7,.9,1,1,.95,.9,.85,.7,.6,.55,.5,.4,.3,.15,.05,0];
+  // agenda (llegadas planificadas) y recepción
+  const agU=shapeArr.map(s=>Math.round(s*jit(38000,46000)*jit(.85,1.15)));
+  const agIS=agU.map(u=>Math.round(u/jit(560,640)));
+  const lleg=agU.map((u,h)=>h<H?Math.round(u*jit(.72,1.12)):null);
+  const llegIS=agIS.map((n,h)=>h<H?Math.round(n*jit(.75,1.05)):null);
+  const planRe=shapeArr.map(s=>Math.round(s*jit(8200,9800)));
+  const realTot=planRe.map((p,h)=>h<H?Math.round(p*(h==H-1?jit(.5,.9):jit(.82,1.4))):null);
+  const realDci=realTot.map(t=>t==null?null:Math.round(t*jit(.58,.8)));
+  const realNor=realTot.map((t,h)=>t==null?null:t-realDci[h]);
+  const recibido=realTot.map((t,h)=>t==null?null:Math.round(t*jit(3.2,4.2)));
+  let bl=jit(9000,14000); const blReal=[], blProj=[];
+  H24.forEach(h=>{ if(h<H){bl=Math.max(0,bl+lleg[h]-recibido[h]);blReal.push(Math.round(bl));blProj.push(h==H-1?Math.round(bl):null);} else {bl=Math.max(0,bl+agU[h]-planRe[h]*3.6);blReal.push(null);blProj.push(Math.round(bl));} });
+  // check-in
+  const ckPlan=H24.map(h=>Math.round((h>=7&&h<=22?jit(8000,10500):jit(3500,5500))));
+  const ckReal=ckPlan.map((p,h)=>h<H?Math.round(p*jit(.9,1.35)):null);
+  const enStage=H24.map(h=>h<H?Math.round((recibido[h]||0)*jit(.45,.6)+(h<7?jit(0,1500):0)):null);
+  let st=jit(105000,120000); const stBl=[],stProj=[];
+  H24.forEach(h=>{ if(h<H){st=Math.max(0,st+enStage[h]-ckReal[h]);stBl.push(Math.round(st));stProj.push(h==H-1?Math.round(st):null);} else {const ent=Math.round(agU[h]*.5);st=Math.max(0,st+ent-ckPlan[h]);stBl.push(null);stProj.push(Math.round(st));} });
+  // DCI
+  const dciPlan=planRe.map((p,h)=>h>=6?Math.round(p*jit(.7,1.2)):0);
+  const dciReal=realDci;
+  const oppLost=dciReal.map((v,h)=>v==null?null:Math.round(v*(h<11?jit(.02,.2):jit(.4,1.6))));
+  // putaway
+  const paPlan=H24.map(h=>Math.round(h>=7&&h<=22?jit(10000,13500):jit(4000,7000)));
+  const paReal=paPlan.map((p,h)=>h<H?Math.round(p*jit(.92,1.15)):null);
+  // no toteable
+  const ntPlan=H24.map(h=>Math.round((h>=10&&h<=14?jit(1100,1250):h>=6&&h<=19?jit(450,950):jit(200,620))));
+  const ntReal=ntPlan.map((p,h)=>h<H?Math.round(p*(r()<.15?jit(.05,.35):jit(.75,1.3))):null);
+  const dotPlan=H24.map(h=>h>=10&&h<=14?10:h>=7&&h<=18?5:3);
+  const dotReal=dotPlan.map((p,h)=>h<H?Math.max(0,Math.round(p*jit(.4,1.5))):null);
+  return {k,H,agU,agIS,lleg,llegIS,planRe,realTot,realDci,realNor,recibido,blReal,blProj,ckPlan,ckReal,enStage,stBl,stProj,dciPlan,dciReal,oppLost,paPlan,paReal,ntPlan,ntReal,dotPlan,dotReal,
+    stage:{doca:Math.round(jit(25,60)),stin:Math.round(jit(500,800)),banc:Math.round(jit(90,170))}};
+}
+
+/* ───────── Chart.js: etiquetas de valor y línea de hora actual ───────── */
+const valueLabels={id:'vl',afterDatasetsDraw(ch,_,o){ if(!o||!o.on) return; const c=ch.ctx; c.save(); c.font='600 10px Arial'; c.fillStyle='rgba(0,0,0,.6)'; c.textAlign='center';
+  ch.data.datasets.forEach((ds,i)=>{ if(ds.type==='line'||ds.noLabel||!ch.isDatasetVisible(i)) return; ch.getDatasetMeta(i).data.forEach((b,j)=>{ const v=ds.data[j]; if(v==null||v===0) return; c.fillText(o.f?o.f(v):kk(v),b.x,b.y-4); }); }); c.restore(); }};
+const nowLine={id:'now',afterDatasetsDraw(ch,_,o){ if(o==null||o.h==null) return; const x=ch.scales.x, y=ch.scales.y, px=x.getPixelForValue(o.h)+ (o.off||0); const c=ch.ctx; c.save(); c.strokeStyle=C.red; c.lineWidth=1.5; c.beginPath(); c.moveTo(px,y.top); c.lineTo(px,y.bottom); c.stroke(); c.restore(); }};
+Chart.register(valueLabels,nowLine);
+Chart.defaults.font.family='-apple-system,"Segoe UI",Roboto,Arial,sans-serif'; Chart.defaults.font.size=11; Chart.defaults.color='rgba(0,0,0,.6)';
+const charts={};
+function chart(id,cfg){ if(charts[id]) charts[id].destroy(); cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index',intersect:false},
+  plugins:Object.assign({legend:{position:'top',align:'end',labels:{boxWidth:10,boxHeight:10}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}},cfg.plugins||{}),
+  scales:Object.assign({x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#eef0fa'},ticks:{callback:v=>kk(v)}}},cfg.scales||{})},cfg.options||{}); delete cfg.plugins; delete cfg.scales;
+  charts[id]=new Chart($(id),cfg); }
+const bar=(label,data,color,extra)=>Object.assign({type:'bar',label,data,backgroundColor:color,borderRadius:2,categoryPercentage:.75,barPercentage:.9},extra||{});
+const line=(label,data,color,extra)=>Object.assign({type:'line',label,data,borderColor:color,backgroundColor:color,pointRadius:2.5,borderWidth:2.2,tension:.35,spanGaps:false},extra||{});
+const kpi=(l,v,s,c)=>`<div class="kpi ${c||''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+
+/* ───────── render ───────── */
+let D;
+function render(){
+  D=gen(); const {H,k}=D, hh=String(H).padStart(2,'0'), mm=String(k.m).padStart(2,'0'), closed=H24.filter(h=>h>=7&&h<H);
+  $('sub').textContent=`Datos simulados · al ${k.day} ${hh}:${mm}`;
+  const t=x=>`${String(H-1).padStart(2,'0')}:${String(Math.min(59,k.m+x)).padStart(2,'0')}`;
+  $('upd').textContent=`Última actualización n8n: Llegadas ${t(0)} · Stage ${t(9)} · Check-in ${t(9)} · Putaway ${t(1)} · DCI ${t(2)} · datos con ~1 h de desfase`;
+
+  /* PMI */
+  const P=[['Check-in',sum(closed.map(h=>D.ckReal[h])),sum(closed.map(h=>D.ckPlan[h])),'Real desde LMS check-in'],
+           ['Direct check-in',sum(closed.map(h=>D.dciReal[h])),sum(closed.map(h=>D.dciPlan[h])),'Plan PMI de DCI'],
+           ['Putaway (toteable + no toteable)',sum(closed.map(h=>D.paReal[h])),sum(closed.map(h=>D.paPlan[h])),'Incluye todas las áreas'],
+           ['No toteable HS + RK',sum(closed.map(h=>D.ntReal[h])),sum(closed.map(h=>D.ntPlan[h])),'Excluye BL']];
+  $('pmiK').innerHTML=kpi('Lectura del total','<span style="font-size:19px">Comparar por proceso</span>','Las unidades pasan por varias etapas; sumarlas como "total inbound" las cuenta más de una vez.')+
+    P.map(([n,r,p,s])=>{const q=pct(r,p);return kpi(n,`<span class="${cls(q)}">${q}%</span>`,`${fmt(r)} real / ${fmt(p)} plan · ${closed.length} h cerradas<br>${s}`,'bord-'+(cls(q)=='ok'?'ok':cls(q)=='wa'?'war':'bad'));}).join('');
+  chart('cPmi',{data:{labels:P.map(x=>x[0]),datasets:[bar('Plan (horas cerradas)',P.map(x=>x[2]),C.plan),bar('Real',P.map(x=>x[1]),[C.blue,C.green,C.amber,C.purple])]},plugins:{vl:{on:1},legend:{position:'bottom'}}});
+  const rowsP=[['Check-in',D.ckReal,D.ckPlan],['Direct check-in',D.dciReal,D.dciPlan],['Putaway',D.paReal,D.paPlan],['No toteable',D.ntReal,D.ntPlan]];
+  $('pmiT').innerHTML=`<table><tr><th>Proceso</th>${closed.map(h=>`<th>${String(h).padStart(2,'0')}</th>`).join('')}</tr>${rowsP.map(([n,re,pl])=>`<tr><td><b>${n}</b></td>${closed.map(h=>{const q=pct(re[h],pl[h]);return `<td class="${cls(q)}">${pl[h]?q+'%':'—'}</td>`;}).join('')}</tr>`).join('')}</table>`;
+
+  /* AGENDA */
+  const isA=sum(D.agIS.slice(0,H)), isL=sum(D.llegIS.slice(0,H)), isTot=sum(D.agIS), uL=sum(D.lleg.slice(0,H)), uTot=sum(D.agU);
+  const blNow=D.blReal[H-1], pk=Math.max(...D.blProj.map(x=>x||0)), pkH=D.blProj.indexOf(pk), cumpl=pct(isL,isA);
+  $('agK').innerHTML=kpi('Cumplimiento agenda',`<span class="${cls(cumpl+10)}">${cumpl}%</span>`,`${fmt(isL)} IS llegados de ${fmt(isA)} agendados hasta las ${hh} h`)+
+    kpi('IS llegados',`${fmt(isL)} <small>/ ${fmt(isTot)}</small>`,`${fmt(isTot-isL)} faltan · ${Math.max(0,isA-isL)} atrasados`)+
+    kpi('Unidades llegadas',fk(uL),`de ${fk(uTot)} agendadas`)+
+    kpi('Backlog recepción',fk(blNow)+' u.',`pico proyectado ${fk(pk)} a las ${pkH} h${D.blProj[23]>5000?' · no se vacía hoy con la capacidad actual':''}`,'warn');
+  const rn=sum(D.realNor), rd=sum(D.realDci), pl=sum(D.planRe);
+  $('agMini').innerHTML=`<div><div class="l">Recibido normal</div><div class="v">${fmt(rn)} u.</div><div class="s">receiving normal</div></div><div><div class="l">Recibido DCI</div><div class="v">${fmt(rd)} u.</div><div class="s">direct check-in</div></div><div><div class="l">Recibido total</div><div class="v">${fmt(rn+rd)} u.</div><div class="s">normal + DCI</div></div><div><div class="l">Agenda recibida</div><div class="v">${pct(rn+rd,sum(D.planRe.slice(0,H)))}%</div><div class="s">${fmt(rn+rd)} de ${fmt(sum(D.planRe.slice(0,H)))} u. planificadas</div></div>`;
+  chart('cRecv',{data:{labels:HL,datasets:[bar('Plan (PMI)',D.planRe,C.plan,{stack:'p'}),bar('Receiving normal',D.realNor,C.blue,{stack:'r',noLabel:1}),bar('Recibido por DCI',D.realDci,C.purple,{stack:'r',noLabel:1}),line('Total recibido (normal + DCI)',D.realTot,'#2d3446',{pointRadius:3,tension:0})]},
+    plugins:{vl:{on:1},now:{h:H,off:-8}},scales:{x:{stacked:true,grid:{display:false}}}});
+  chart('cBl',{data:{labels:HL,datasets:[line('Backlog real',D.blReal,C.orange),line('Backlog proyectado',D.blProj,C.orange,{borderDash:[5,5],pointStyle:'rect'}),bar('Llegó',D.lleg,C.navy),bar('Recibido',D.recibido,'#6aa84f'),bar('Llegada esperada (agenda)',D.agU.map((v,h)=>h>=H?v:null),'#f6c27a')]},plugins:{vl:{on:0}}});
+  const nx=Math.min(23,H+1); $('prox').innerHTML=`<h3>Próxima hora · ${nx} h</h3><div class="nh"><div><div class="v">${D.agIS[nx]}</div><div class="s">IS agendados</div></div><div><div class="v">${fk(D.agU[nx])}</div><div class="s">unidades</div></div><div><div class="v">${Math.max(0,isA-isL)} IS</div><div class="s">atrasados que se suman</div></div></div>
+   <div class="mix">${[['NT HS',22,'#1e2360'],['Moda',30,'#00a650'],['Cosmética',13,'#2e7d32'],['Alimentos',20,'#66bb6a'],['Salud',15,'#a5d6a7']].map(x=>`<div style="width:${x[1]}%;background:${x[2]}"></div>`).join('')}</div>
+   <div class="mixl">${[['NT HS',22,'#1e2360'],['Moda',30,'#00a650'],['Cosmética',13,'#2e7d32'],['Alimentos',20,'#66bb6a'],['Salud',15,'#a5d6a7']].map(x=>`<span><i style="background:${x[2]}"></i>${x[0]} ${x[1]}%</span>`).join('')}</div>`;
+  const al=[]; if(pk>blNow*1.2) al.push(['r',`Backlog de recepción subirá a ${fk(pk)} u. a las ${pkH} h: reforzar dotación en receiving.`]);
+  const dciP=pct(sum(D.dciReal),sum(D.dciPlan.slice(0,H))); if(dciP<90) al.push(['y',`Direct check-in al ${dciP}% del plan: revisar oportunidad perdida.`]);
+  if(cumpl<90) al.push(['y',`Cumplimiento de agenda ${cumpl}%: ${Math.max(0,isA-isL)} IS atrasados; contactar transportistas.`]);
+  al.push(['k',`Check-in acumulado al ${pct(sum(D.ckReal),sum(D.ckPlan.slice(0,H)))}% del plan.`]);
+  $('alerts').innerHTML=al.map(([c,t])=>`<div class="al"><i style="background:${{r:C.red,y:C.amber,k:C.green}[c]}"></i><div>${t}</div></div>`).join('');
+
+  /* DCI */
+  const dr=sum(D.dciReal), dp=sum(D.dciPlan.slice(0,H)), hEf=Math.round(dr/jitHours());
+  function jitHours(){return 820+((k.seed%97));}
+  $('dciK').innerHTML=kpi('Throughput',fmt(dr),`plan a esta hora ${fmt(dp)} · <span class="${cls(pct(dr,dp))}">${pct(dr,dp)-100>0?'+':''}${pct(dr,dp)-100}%</span>`)+kpi('Horas efectivas',fmt(hEf),'horas-persona en DCI')+kpi('Productividad efectiva',fmt(dr/hEf),'unidades por hora-persona');
+  chart('cDci',{data:{labels:HL,datasets:[bar('Plan (PMI)',D.dciPlan,C.plan),bar('Real',D.dciReal,C.blue)]},plugins:{vl:{on:1},now:{h:H,off:-8}}});
+  const oppPct=D.dciReal.map((v,h)=>v==null||!(v+D.oppLost[h])?null:Math.round(v/(v+D.oppLost[h]||1)*100));
+  chart('cOpp',{data:{labels:HL,datasets:[bar('Por DCI',D.dciReal,C.blue,{stack:'o'}),bar('Por check-in normal (perdida)',D.oppLost,C.amber,{stack:'o'}),line('% por DCI',oppPct,C.navy,{yAxisID:'y2',tension:.3})]},
+    plugins:{vl:{on:0},now:{h:H,off:-8}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#eef0fa'},ticks:{callback:v=>kk(v)}},y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}}}});
+
+  /* CHECK-IN */
+  const ckR=sum(D.ckReal), ckP=sum(D.ckPlan.slice(0,H)), stNow=D.stBl[H-1], stEnd=D.stProj[23];
+  $('ckK').innerHTML=kpi('Check-in del día',fmt(ckR),`plan a esta hora ${fmt(ckP)} · <span class="${cls(pct(ckR,ckP))}">${pct(ckR,ckP)}%</span>`)+kpi('Backlog de stage',fk(stNow)+' u.',`inicio del día ${fk(D.stBl[0])}`)+kpi('Cierre proyectado (24:00)',fk(stEnd)+' u.',stEnd>stNow?'el backlog crece con el plan actual':'el backlog baja con el plan actual',stEnd>stNow?'warn':'')+kpi('Entró a stage hoy',fmt(sum(D.enStage)),'unidades recibidas que pasan a check-in');
+  $('ckD').innerHTML=`Cómo se lee: parto del backlog de stage a las ${hh} h. Cada hora <b>sumo</b> lo que se recibe y <b>resto</b> lo planificado en check-in + DCI. Cierre del día (24:00): <b class="bad">${fmt(stEnd)}</b> uds.`;
+  chart('cCkBl',{data:{labels:HL,datasets:[line('Backlog real',D.stBl,C.blue,{fill:{target:'origin',above:'rgba(52,131,250,.1)'}}),line('Proyectado',D.stProj,C.blue,{borderDash:[5,5]}),bar('Llega (patio + agenda)',D.agU.map((v,h)=>h>=H?Math.round(v*.5):null),'#f6c27a')]},plugins:{vl:{on:0},now:{h:H}}});
+  const fut=H24.filter(h=>h>=H); let tg=stNow;
+  $('ckT').innerHTML=`<table><tr><th>Hora</th>${fut.map(h=>`<th class="${h==H?'cur':''}">${String(h).padStart(2,'0')}</th>`).join('')}</tr>`+
+    [['Tengo (inicio de la hora)',h=>{const v=tg;return v;}],].map(()=>'').join('')+
+    (()=>{let a=stNow,rows={i:[],s:[],r:[],f:[]};fut.forEach(h=>{const s=Math.round(D.agU[h]*.5),rr=D.ckPlan[h];rows.i.push(a);rows.s.push(s);rows.r.push(rr);a=Math.max(0,a+s-rr);rows.f.push(a);});
+      const tr=(n,arr,b)=>`<tr><td>${b?'<b>'+n+'</b>':n}</td>${arr.map((v,i)=>`<td class="${i==0?'cur':''}">${b?'<b>'+fmt(v)+'</b>':fmt(v)}</td>`).join('')}</tr>`;
+      return tr('Tengo (inicio de la hora)',rows.i)+tr('+ Sumo: se recibe (patio + agenda +1 h)',rows.s)+tr('− Resto: check-in + DCI planificado',rows.r)+tr('= Me queda (fin de la hora)',rows.f,1);})()+`</table>`;
+  const acc=a=>{let s=0;return a.map(v=>v==null?null:(s+=v));};
+  chart('cCkAc',{data:{labels:HL,datasets:[line('Planificado',acc(D.ckPlan),'#9aa0b4',{borderDash:[4,4],pointRadius:0}),line('Procesado',acc(D.ckReal),C.navy),line('Entró a stage',acc(D.enStage),C.amber)]},plugins:{vl:{on:0}}});
+  $('stg').innerHTML=[['Doca',D.stage.doca,'máx 8,5 h'],['Stage In',D.stage.stin,'máx 26 h'],['Bancada',D.stage.banc,'máx 26 h']].map(x=>`<div><div class="s" style="font-size:11.5px;color:var(--mut);font-weight:700">${x[0]}</div><div class="v">${x[1]}</div><div style="font-size:10.5px;color:var(--soft)">${x[2]}</div></div>`).join('');
+  const G=[['Toteable',Math.round(stNow*.92),'#2e7d32'],['No toteable · HS',Math.round(stNow*.05),'#1e2360'],['No toteable · RK',Math.round(stNow*.01),'#3483fa'],['No toteable · sin dato',Math.round(stNow*.02),'#a9c8f7']];
+  $('stgMix').innerHTML=`<div class="mix">${G.map(g=>`<div style="width:${g[1]/stNow*100}%;background:${g[2]}"></div>`).join('')}</div><div class="mixl"><span>Toteable 92% · No toteable 8% (por unidades)</span></div>`;
+  $('stgT').innerHTML=`<table><tr><th>Grupo</th><th>Pallets</th><th>Uds</th><th>Horas</th></tr>${G.map(g=>`<tr><td><span class="sq" style="background:${g[2]}"></span>${g[0]}</td><td>${fmt(g[1]/270)}</td><td>${fk(g[1])}</td><td>${fmt(g[1]/290)}</td></tr>`).join('')}</table>`;
+
+  /* NO TOTEABLE */
+  const nr=sum(D.ntReal), np=sum(D.ntPlan.slice(0,H)), dR=D.dotReal.filter(x=>x!=null), dP=D.dotPlan.slice(0,H);
+  $('ntK').innerHTML=kpi('Guardado no toteable',fmt(nr),`plan a esta hora ${fmt(np)} · <span class="${cls(pct(nr,np))}">${pct(nr,np)}%</span>`)+kpi('Productividad',fmt(nr/Math.max(1,sum(dR))),'unidades por persona-hora')+kpi('Dotación promedio',(sum(dR)/Math.max(1,dR.length)).toFixed(1).replace('.',','),`plan ${(sum(dP)/Math.max(1,dP.length)).toFixed(1).replace('.',',')} por hora`)+kpi('Pendiente en stage',fk(stNow*.08),'unidades no toteables por guardar','warn');
+  chart('cNt',{data:{labels:HL,datasets:[bar('Plan total',D.ntPlan,C.plan),bar('Real total (HS + RK)',D.ntReal,C.blue)]},plugins:{vl:{on:1,f:v=>v>=1000?(v/1000).toFixed(1)+'k':v},now:{h:H,off:8}}});
+  chart('cDot',{data:{labels:HL,datasets:[bar('Plan del turno',D.dotPlan,C.plan),bar('Personas reales',D.dotReal,C.green)]},plugins:{vl:{on:1,f:v=>v},now:{h:H,off:8}},scales:{y:{beginAtZero:true,grid:{color:'#eef0fa'}}}});
+}
+
+/* ───────── navegación ───────── */
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
+  $('title').textContent=$('v-'+b.dataset.v).dataset.t; window.scrollTo(0,0);
+  Object.values(charts).forEach(c=>c.resize());
+});
+$('reload').onclick=()=>{ const b=$('reload'); b.textContent='Actualizando…'; setTimeout(()=>{render(); b.textContent='Actualizar';},400); };
+const v0=(location.hash||'').slice(1); render(); if(v0){const b=document.querySelector(`#nav button[data-v="${v0}"]`); if(b) b.click();}
+setInterval(render,5*60*1000);
+</script>
+</body>
+</html>
